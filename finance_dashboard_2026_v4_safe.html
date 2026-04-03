@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>재무 대시보드 2026 v4 — 빚 청산 운영판</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F5F4F0;
+  --surface: #FFFFFF;
+  --surface-2: #F0EEE9;
+  --surface-3: #E8E5DF;
+  --border: #E2DDD6;
+  --border-light: #EDE9E3;
+  --text-1: #18180F;
+  --text-2: #5C5950;
+  --text-3: #9A9589;
+  --green: #1A6B42;
+  --green-bg: #EBF5EF;
+  --red: #B83232;
+  --red-bg: #FBF0F0;
+  --amber: #8A5A00;
+  --amber-bg: #FFF7E6;
+  --blue: #1A4D8A;
+  --blue-bg: #EDF3FB;
+  --mono: 'DM Mono', monospace;
+  --sans: 'Noto Sans KR', sans-serif;
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text-1);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.page { max-width: 820px; margin: 0 auto; padding: 24px 16px 80px; }
+
+/* ─── HEADER ─── */
+.page-header { margin-bottom: 20px; }
+.header-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.page-title { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
+.page-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.save-row { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.save-badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-family: var(--mono); white-space: nowrap; }
+.badge-saved { background: var(--green-bg); color: var(--green); }
+.badge-default { background: var(--surface-3); color: var(--text-3); }
+.save-time { font-size: 10px; color: var(--text-3); font-family: var(--mono); }
+
+/* ─── SUMMARY CARDS ─── */
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 7px; margin-bottom: 20px; }
+.s-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 11px 14px; }
+.s-label { font-size: 10px; color: var(--text-3); margin-bottom: 3px; }
+.s-value { font-family: var(--mono); font-size: 18px; font-weight: 500; line-height: 1.1; }
+.s-sub { font-size: 10px; color: var(--text-3); margin-top: 2px; }
+.pos { color: var(--green); }
+.neg { color: var(--red); }
+.warn { color: var(--amber); }
+.info { color: var(--blue); }
+.muted { color: var(--text-3); }
+
+/* ─── TABS ─── */
+.tab-bar { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; gap: 0; }
+.tab-btn {
+  background: none; border: none; padding: 9px 18px;
+  font-family: var(--sans); font-size: 13px; font-weight: 400;
+  color: var(--text-3); cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color .15s;
+}
+.tab-btn:hover { color: var(--text-2); }
+.tab-btn.active { color: var(--text-1); font-weight: 600; border-bottom-color: var(--text-1); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ─── BASE CONFIG ─── */
+.base-config {
+  background: var(--surface); border: 0.5px solid var(--border);
+  border-radius: var(--radius); padding: 12px 16px; margin-bottom: 14px;
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+}
+.bc-item { display: flex; align-items: center; gap: 8px; }
+.bc-label { font-size: 11px; color: var(--text-2); white-space: nowrap; }
+.bc-input {
+  font-family: var(--mono); font-size: 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 4px 8px; width: 130px; background: var(--surface);
+  color: var(--text-1); outline: none;
+}
+.bc-input:focus { border-color: var(--blue); }
+.bc-note { font-size: 10px; color: var(--text-3); margin-left: auto; }
+
+/* ─── SHEET TABLE ─── */
+.sheet-wrap { overflow-x: auto; border-radius: var(--radius); border: 0.5px solid var(--border); background: var(--surface); }
+.sheet-table { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 700px; }
+.sheet-table th {
+  background: var(--surface-2); font-size: 12px; font-weight: 600;
+  padding: 8px 10px; text-align: center; border-bottom: 1px solid var(--border);
+  border-right: 0.5px solid var(--border-light); white-space: nowrap;
+  position: sticky; top: 0; z-index: 2;
+}
+.sheet-table th:first-child { text-align: left; position: sticky; left: 0; z-index: 3; background: var(--surface-3); }
+.sheet-table td {
+  padding: 3px 6px; border-bottom: 0.5px solid var(--border-light);
+  border-right: 0.5px solid var(--border-light); vertical-align: middle;
+}
+.sheet-table td:first-child {
+  font-size: 12px; color: var(--text-2); white-space: nowrap;
+  background: var(--surface-2); padding: 5px 10px; font-weight: 400;
+  position: sticky; left: 0; z-index: 1;
+}
+/* Section divider rows */
+.row-section td {
+  background: var(--bg); font-size: 10px; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .08em; padding: 6px 10px;
+  font-weight: 600; border-right: none;
+}
+.row-section td:not(:first-child) { background: var(--bg); }
+/* Input cells */
+.sheet-input {
+  width: 100%; font-family: var(--mono); font-size: 12px;
+  border: 1px solid transparent; border-radius: 3px;
+  padding: 4px 6px; background: transparent; color: var(--text-1);
+  outline: none; text-align: right;
+}
+.sheet-input[type="text"] { text-align: left; }
+.sheet-input:focus { border-color: #AABFDD; background: var(--blue-bg); }
+.sheet-input::placeholder { color: var(--text-3); font-size: 11px; }
+/* Calc cells */
+.row-calc td { background: var(--surface-2); }
+.row-calc td:first-child { background: var(--surface-3); font-weight: 500; font-size: 11px; color: var(--text-2); }
+.calc-cell {
+  font-family: var(--mono); font-size: 12px; text-align: right;
+  padding: 5px 8px; white-space: nowrap; display: block;
+}
+.calc-cell.pos { color: var(--green); }
+.calc-cell.neg { color: var(--red); }
+.calc-cell.warn { color: var(--amber); }
+.calc-cell.ok { color: var(--green); font-size: 11px; }
+.calc-cell.muted { color: var(--text-3); font-size: 11px; }
+/* Special row highlighting */
+.row-repay td:first-child { color: #5A2D9E; }
+.row-eom td { background: #F0F5FB; }
+.row-eom td:first-child { background: #E8EFF8; font-weight: 600; color: var(--blue); }
+.row-eom .calc-cell { font-size: 14px; font-weight: 500; }
+
+/* ─── SHEET ACTIONS ─── */
+.sheet-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.btn {
+  padding: 7px 14px; border: none; border-radius: var(--radius-sm);
+  font-family: var(--sans); font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: opacity .15s;
+}
+.btn:hover { opacity: .82; }
+.btn-primary { background: var(--text-1); color: #fff; }
+.btn-ghost { background: var(--surface-2); color: var(--text-2); border: 0.5px solid var(--border); }
+.btn-green { background: var(--green-bg); color: var(--green); }
+.btn-blue { background: var(--blue-bg); color: var(--blue); }
+.sheet-msg { font-size: 11px; }
+.msg-ok { color: var(--green); }
+.msg-err { color: var(--red); }
+.msg-warn { color: var(--amber); }
+
+/* ─── ACCORDION (정산 탭) ─── */
+.accordion { border: 0.5px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 6px; }
+.accordion-header {
+  width: 100%; background: var(--surface); border: none; padding: 11px 15px;
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  text-align: left; font-family: var(--sans); font-size: 13px;
+  font-weight: 500; color: var(--text-1); transition: background .15s;
+}
+.accordion-header:hover { background: var(--surface-2); }
+.accordion-header.open { background: var(--surface-2); }
+.acc-arrow { font-size: 9px; color: var(--text-3); transition: transform .2s; flex-shrink: 0; }
+.acc-arrow.open { transform: rotate(90deg); }
+.acc-badge { font-size: 10px; padding: 1px 6px; border-radius: 3px; font-family: var(--mono); margin-left: auto; }
+.acc-badge-ok { background: var(--green-bg); color: var(--green); }
+.acc-badge-warn { background: var(--amber-bg); color: var(--amber); }
+.acc-badge-empty { background: var(--surface-3); color: var(--text-3); }
+.acc-badge-err { background: var(--red-bg); color: var(--red); }
+.accordion-body { display: none; border-top: 0.5px solid var(--border-light); }
+.accordion-body.open { display: block; }
+.accordion-inner { padding: 14px 16px; }
+
+/* 정산 그리드 */
+.settle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.settle-block { background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 12px; }
+.settle-block-label { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; }
+.settle-block-value { font-family: var(--mono); font-size: 17px; font-weight: 500; }
+.settle-block-sub { font-size: 10px; color: var(--text-3); margin-top: 2px; }
+.row-table { width: 100%; border-collapse: collapse; }
+.row-table td { padding: 5px 0; font-size: 12px; border-bottom: 0.5px solid var(--border-light); }
+.row-table tr:last-child td { border-bottom: none; }
+.row-table .lbl { color: var(--text-2); }
+.row-table .val { text-align: right; font-family: var(--mono); font-size: 12px; }
+.row-table .sub { font-size: 11px; color: var(--text-3); padding-left: 12px; }
+.total-row td { font-weight: 600; padding-top: 8px; border-top: 1px solid var(--border); border-bottom: none; font-size: 13px; }
+
+/* ─── NOTICE ─── */
+.notice {
+  border-radius: var(--radius-sm); padding: 7px 10px; margin-top: 7px;
+  font-size: 11px; display: flex; align-items: flex-start; gap: 7px;
+}
+.notice-warn { background: var(--amber-bg); color: var(--amber); }
+.notice-green { background: var(--green-bg); color: var(--green); }
+.notice-blue { background: var(--blue-bg); color: var(--blue); }
+.notice-red { background: var(--red-bg); color: var(--red); }
+
+/* ─── ERRORS SECTION ─── */
+.alert-list { display: flex; flex-direction: column; gap: 5px; margin-top: 16px; }
+.alert-item { border-radius: var(--radius-sm); padding: 8px 12px; display: flex; gap: 8px; align-items: flex-start; }
+.alert-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.alert-body { font-size: 12px; }
+.alert-action { font-size: 11px; margin-top: 2px; opacity: .75; }
+
+/* ─── BACKUP TAB ─── */
+.backup-section { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 10px; }
+.backup-section-title { font-size: 11px; font-weight: 600; color: var(--text-2); margin-bottom: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.btn-row { display: flex; gap: 7px; flex-wrap: wrap; }
+.json-area {
+  width: 100%; min-height: 180px; font-family: var(--mono); font-size: 11px;
+  background: #1A1A14; color: #E8E4D9; border: none; border-radius: var(--radius-sm);
+  padding: 13px; resize: vertical; outline: none; line-height: 1.65; margin-top: 10px;
+}
+.json-msg { font-size: 11px; margin-top: 6px; min-height: 18px; }
+.collapsible-btn {
+  background: none; border: none; font-family: var(--sans); font-size: 11px;
+  color: var(--text-3); cursor: pointer; padding: 6px 0;
+  display: flex; align-items: center; gap: 5px;
+}
+.collapsible-btn::before { content: '▶'; font-size: 8px; transition: transform .2s; }
+.collapsible-btn.open::before { transform: rotate(90deg); }
+.collapsible-body { display: none; }
+.collapsible-body.open { display: block; }
+.file-input-hidden { display: none; }
+.repay-schedule-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.rs-item { display: flex; flex-direction: column; gap: 3px; }
+.rs-label { font-size: 10px; color: var(--text-3); }
+.rs-input {
+  font-family: var(--mono); font-size: 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 4px 6px; text-align: right;
+  background: var(--surface); color: var(--text-1); outline: none;
+}
+.rs-input:focus { border-color: var(--blue); }
+
+hr.div { border: none; border-top: 0.5px solid var(--border); margin: 10px 0; }
+
+@media (max-width: 520px) {
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .settle-grid { grid-template-columns: 1fr; }
+  .tab-btn { padding: 8px 12px; font-size: 12px; }
+  .base-config { flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ═══ HEADER ═══ -->
+<div class="page-header">
+  <div class="header-top">
+    <div>
+      <div class="page-title">재무 대시보드 2026 v4</div>
+      <div class="page-sub">빚 청산 운영판 · 2026년 4월~8월 · 라쿠텐 리보 완납 목표</div>
+    </div>
+    <div class="save-row">
+      <span class="save-badge badge-default" id="save-badge">기본값</span>
+      <span class="save-time" id="save-time"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SUMMARY CARDS ═══ -->
+<div class="summary-grid" id="summary-cards"></div>
+
+<!-- ═══ TABS ═══ -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('sheet')">월별 입력 시트</button>
+  <button class="tab-btn" onclick="switchTab('settle')">월별 정산 보기</button>
+  <button class="tab-btn" onclick="switchTab('backup')">백업 / 고급 관리</button>
+</div>
+
+<!-- ═══ TAB 1: 월별 입력 시트 ═══ -->
+<div class="tab-content active" id="tab-sheet">
+
+  <!-- 기준값 설정 -->
+  <div class="base-config">
+    <div class="bc-item">
+      <span class="bc-label">4월 월초 잔고</span>
+      <input type="number" class="bc-input" id="bc-current-cash"
+        onchange="updateBaseConfig('current_cash', this.value)" min="0" step="10000">
+    </div>
+    <div class="bc-item">
+      <span class="bc-label">리보 현재 잔액</span>
+      <input type="number" class="bc-input" id="bc-revo-balance"
+        onchange="updateBaseConfig('rakuten_revo_balance', this.value)" min="0" step="10000">
+    </div>
+    <div class="bc-item">
+      <span class="bc-label">버퍼 기준</span>
+      <input type="number" class="bc-input" id="bc-buffer-floor"
+        onchange="updateBaseConfig('buffer_floor', this.value)" min="0" step="10000">
+    </div>
+    <span class="bc-note">← 이 값들이 전체 잔고 계산의 시작점</span>
+  </div>
+
+  <!-- 입력 시트 테이블 -->
+  <div class="sheet-wrap">
+    <table class="sheet-table" id="sheet-table">
+      <!-- renderSheet()로 생성 -->
+    </table>
+  </div>
+
+  <div class="sheet-actions">
+    <button class="btn btn-primary" onclick="saveManual()">저장</button>
+    <span id="sheet-msg" class="sheet-msg"></span>
+    <span style="font-size:10px;color:var(--text-3);margin-left:auto;">값 변경 후 저장 버튼 클릭 또는 자동 저장(3초)</span>
+  </div>
+
+  <!-- 운영 경고 -->
+  <div class="alert-list" id="alert-list"></div>
+</div>
+
+<!-- ═══ TAB 2: 월별 정산 보기 ═══ -->
+<div class="tab-content" id="tab-settle">
+  <div id="settle-accordions"></div>
+</div>
+
+<!-- ═══ TAB 3: 백업 / 고급 관리 ═══ -->
+<div class="tab-content" id="tab-backup">
+
+  <!-- GAS URL 설정 -->
+  <div class="backup-section">
+    <div class="backup-section-title">☁ Drive 연결 설정 (GAS URL)</div>
+    <div style="font-size:11px;color:var(--text-3);margin-bottom:10px;">
+      처음 한 번만 입력하면 이 기기에 저장됩니다. GitHub 코드에는 포함되지 않습니다.
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/.../exec"
+        style="flex:1;min-width:200px;font-family:var(--mono);font-size:11px;
+               border:1px solid var(--border);border-radius:var(--radius-sm);
+               padding:6px 10px;outline:none;background:var(--surface);color:var(--text-1);">
+      <button class="btn btn-primary" onclick="saveGasUrl()">저장</button>
+      <button class="btn btn-ghost" onclick="testGasConnection()">연결 테스트</button>
+    </div>
+    <div class="json-msg" id="gas-url-msg"></div>
+  </div>
+
+  <!-- 저장 상태 -->
+  <div class="backup-section">
+    <div class="backup-section-title">저장 상태</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span class="save-badge badge-default" id="backup-save-badge">기본값</span>
+      <span class="save-time" id="backup-save-time"></span>
+    </div>
+    <div class="btn-row" style="margin-top:10px;">
+      <button class="btn btn-green" onclick="copyCurrentState()">현재 상태 JSON 복사</button>
+      <button class="btn btn-blue" onclick="downloadBackup()">백업 다운로드</button>
+      <label class="btn btn-ghost" style="cursor:pointer;">
+        백업 불러오기
+        <input type="file" accept=".json" class="file-input-hidden" id="backup-file" onchange="loadBackup(this)">
+      </label>
+      <button class="btn btn-ghost" onclick="resetAll()" style="color:var(--red);">초기화</button>
+    </div>
+    <div class="json-msg" id="backup-msg"></div>
+  </div>
+
+  <!-- 계획 상환액 설정 -->
+  <div class="backup-section">
+    <div class="backup-section-title">계획 상환액 (repayment_schedule)</div>
+    <div style="font-size:11px;color:var(--text-3);margin-bottom:10px;">입력 시트의 "리보 상환액"은 실제값. 여기는 계획값으로 비교 기준으로만 사용됩니다.</div>
+    <div class="repay-schedule-grid" id="repay-schedule-inputs"></div>
+  </div>
+
+  <!-- JSON 원시 편집 (접이식) -->
+  <div class="backup-section">
+    <button class="collapsible-btn" onclick="toggleCollapse('json-raw-body', this)" id="json-raw-btn">
+      JSON 원시 편집 (고급)
+    </button>
+    <div class="collapsible-body" id="json-raw-body">
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;margin-top:8px;">
+        변경할 필드만 입력하세요. deep merge 방식 — 배열은 통째로 교체됩니다.
+      </div>
+      <textarea class="json-area" id="json-raw-input" placeholder='{
+  "monthly_settlements": {
+    "2026-04": {
+      "salary": 243500,
+      "debt_repayment_actual": 80000,
+      "rakuten_bill": 274306
+    }
+  }
+}'></textarea>
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-primary" onclick="applyRawJSON()">JSON 적용</button>
+        <button class="btn btn-ghost" onclick="showCurrentJSON()">현재 JSON 표시</button>
+      </div>
+      <div class="json-msg" id="json-raw-msg"></div>
+    </div>
+  </div>
+
+</div>
+<!-- /page -->
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// 1. CONSTANTS
+// ════════════════════════════════════════════════
+const STORAGE_KEY = 'finance_dashboard_2026_state';
+const GAS_URL_KEY = 'finance_dashboard_2026_gas_url';
+function getGasUrl() { return localStorage.getItem(GAS_URL_KEY) || ''; }
+function setGasUrl(url) { localStorage.setItem(GAS_URL_KEY, url.trim()); }
+const MONTHS = ['2026-04','2026-05','2026-06','2026-07','2026-08'];
+const M_LABEL = {
+  '2026-04':'4월','2026-05':'5월','2026-06':'6월','2026-07':'7월','2026-08':'8월'
+};
+
+// 시트 행 정의
+const INCOME_ROWS = [
+  { field:'salary',               label:'급여',           type:'number' },
+  { field:'side_income_1_name',   label:'부수입① 이름',    type:'text'   },
+  { field:'side_income_1_amount', label:'부수입① 금액',    type:'number' },
+  { field:'side_income_2_name',   label:'부수입② 이름',    type:'text'   },
+  { field:'side_income_2_amount', label:'부수입② 금액',    type:'number' },
+];
+const EXPENSE_ROWS = [
+  { field:'rakuten_bill',           label:'라쿠텐 카드',    type:'number' },
+  { field:'paypay_bill',            label:'PayPay 카드',    type:'number' },
+  { field:'paidy_bill',             label:'Paidy',           type:'number' },
+  { field:'rent',                   label:'야칭',            type:'number' },
+  { field:'phone',                  label:'폰비',            type:'number' },
+  { field:'tax',                    label:'세금',            type:'number' },
+  { field:'misc_expense',           label:'기타지출',        type:'number' },
+  { field:'debt_repayment_actual',  label:'리보 상환액',     type:'number', cls:'row-repay' },
+];
+const META_ROWS = [
+  { field:'note', label:'메모', type:'text' },
+];
+const CALC_ROWS = [
+  { field:'open_balance',  label:'월초 잔고',         cls:'' },
+  { field:'total_income',  label:'총수입',             cls:'' },
+  { field:'total_expense', label:'총지출',             cls:'' },
+  { field:'close_balance', label:'월말 잔고',          cls:'row-eom' },
+  { field:'buffer_status', label:'버퍼 상태',          cls:'' },
+  { field:'repay_diff',    label:'계획 vs 실제 상환',  cls:'' },
+];
+
+// ════════════════════════════════════════════════
+// 2. DEFAULT DATA
+// ════════════════════════════════════════════════
+const DEFAULT_DATA = {
+  meta: { buffer_floor: 100000 },
+  balances: { current_cash: 499432, rakuten_revo_balance: 472656 },
+  repayment_schedule: {
+    '2026-04': 100000, '2026-05': 100000,
+    '2026-06': 100000, '2026-07': 100000, '2026-08': 0
+  },
+  monthly_settlements: {
+    '2026-04': {
+      salary: 250000,
+      side_income_1_name: '체험단/리뷰', side_income_1_amount: 13784,
+      side_income_2_name: '', side_income_2_amount: 0,
+      rakuten_bill: 259269, paypay_bill: 190044, paidy_bill: 8364,
+      rent: 70550, phone: 3000, tax: 0, misc_expense: 0,
+      debt_repayment_actual: 100000, note: '라쿠텐 리보 수동 상환 필요'
+    },
+    '2026-05': {
+      salary: 260000,
+      side_income_1_name: '', side_income_1_amount: 0,
+      side_income_2_name: '', side_income_2_amount: 0,
+      rakuten_bill: 0, paypay_bill: 0, paidy_bill: 0,
+      rent: 70550, phone: 3000, tax: 7000, misc_expense: 0,
+      debt_repayment_actual: 100000, note: ''
+    },
+    '2026-06': {
+      salary: 260000,
+      side_income_1_name: '', side_income_1_amount: 0,
+      side_income_2_name: '', side_income_2_amount: 0,
+      rakuten_bill: 0, paypay_bill: 0, paidy_bill: 0,
+      rent: 70550, phone: 3000, tax: 7000, misc_expense: 0,
+      debt_repayment_actual: 100000, note: ''
+    },
+    '2026-07': {
+      salary: 260000,
+      side_income_1_name: '', side_income_1_amount: 0,
+      side_income_2_name: '', side_income_2_amount: 0,
+      rakuten_bill: 0, paypay_bill: 0, paidy_bill: 0,
+      rent: 70550, phone: 3000, tax: 7000, misc_expense: 0,
+      debt_repayment_actual: 100000, note: ''
+    },
+    '2026-08': {
+      salary: 260000,
+      side_income_1_name: '상여', side_income_1_amount: 490000,
+      side_income_2_name: '', side_income_2_amount: 0,
+      rakuten_bill: 0, paypay_bill: 0, paidy_bill: 0,
+      rent: 70550, phone: 3000, tax: 7000, misc_expense: 0,
+      debt_repayment_actual: 0, note: '상여 수령 후 리보 잔액 전액 상환 예정'
+    }
+  }
+};
+
+// ════════════════════════════════════════════════
+// 3. STATE VARS — loadState() 호출 전에 반드시 선언
+// ════════════════════════════════════════════════
+let hasSavedState = false;
+let lastSaveTime  = null;
+let _loadWarning  = null;
+let _saveTimer    = null;
+
+// ════════════════════════════════════════════════
+// 4. loadState — GAS에서 불러오기 (비동기)
+//    페이지 로드 시 init()에서 호출
+// ════════════════════════════════════════════════
+async function loadFromGAS() {
+  const url = getGasUrl();
+  if (!url) {
+    showMsg('sheet-msg', '⚙ GAS URL 미설정 — 백업/고급 탭에서 URL을 입력하세요', 'warn', 0);
+    return;
+  }
+  try {
+    showMsg('sheet-msg', '☁ Drive에서 불러오는 중...', 'warn', 0);
+    const res = await fetch(url, { method: 'GET' });
+    const json = await res.json();
+    if (json.status === 'ok' && json.data) {
+      hasSavedState = true;
+      lastSaveTime  = json.data.__savedAt || null;
+      delete json.data.__savedAt;
+      D = json.data;
+      showMsg('sheet-msg', '✓ Drive에서 불러오기 완료', 'ok', 3000);
+    } else if (json.status === 'empty') {
+      showMsg('sheet-msg', '☁ Drive 저장본 없음 — 기본값 사용', 'warn', 4000);
+    } else {
+      throw new Error(json.message || '알 수 없는 오류');
+    }
+  } catch (e) {
+    _loadWarning = '⚠ Drive 연결 실패 — 로컬 캐시로 복구 시도 중';
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        hasSavedState = true;
+        lastSaveTime  = parsed.__savedAt || null;
+        delete parsed.__savedAt;
+        D = parsed;
+      }
+    } catch (e2) { /* 기본값 유지 */ }
+  }
+}
+
+// ════════════════════════════════════════════════
+// 5. D 초기화 — 기본값으로 시작, init()에서 GAS 로드
+// ════════════════════════════════════════════════
+let D = JSON.parse(JSON.stringify(DEFAULT_DATA));
+
+// ════════════════════════════════════════════════
+// 6. SAVE — GAS POST + localStorage 이중 저장
+// ════════════════════════════════════════════════
+async function saveState() {
+  const toSave = JSON.parse(JSON.stringify(D));
+  toSave.__savedAt = new Date().toISOString();
+
+  // localStorage에도 캐시 (오프라인 fallback용)
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave)); } catch(e) {}
+
+  // GAS로 전송
+  try {
+    const url = getGasUrl();
+    if (!url) return false;
+    const res = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify(toSave)
+    });
+    const json = await res.json();
+    if (json.status === 'ok') {
+      lastSaveTime  = json.savedAt || toSave.__savedAt;
+      hasSavedState = true;
+      return true;
+    } else {
+      throw new Error(json.message || '저장 실패');
+    }
+  } catch (e) {
+    // GAS 실패해도 localStorage는 이미 저장됨
+    hasSavedState = true;
+    lastSaveTime  = toSave.__savedAt;
+    return false; // false = GAS 실패 (로컬은 OK)
+  }
+}
+
+function deepMerge(target, source) {
+  const result = JSON.parse(JSON.stringify(target));
+  for (const key of Object.keys(source)) {
+    const sv = source[key], tv = result[key];
+    if (Array.isArray(sv)) {
+      result[key] = JSON.parse(JSON.stringify(sv));
+    } else if (sv !== null && typeof sv === 'object' && tv !== null && typeof tv === 'object' && !Array.isArray(tv)) {
+      result[key] = deepMerge(tv, sv);
+    } else {
+      result[key] = sv;
+    }
+  }
+  return result;
+}
+
+function scheduleSave() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(async () => {
+    const ok = await saveState();
+    updateSaveBadge();
+    showMsg('sheet-msg', ok ? '☁ Drive 저장 완료' : '⚠ Drive 저장 실패 (로컬 캐시는 OK)', ok ? 'ok' : 'warn', 3000);
+  }, 3000);
+}
+
+// ════════════════════════════════════════════════
+// 7. CALC HELPERS
+// ════════════════════════════════════════════════
+const yen = (n) => '¥' + Math.round(n).toLocaleString('ja-JP');
+const num = (v) => parseFloat(v) || 0;
+const ms  = (m) => D.monthly_settlements?.[m] || {};
+
+function openBalance(m) {
+  const idx = MONTHS.indexOf(m);
+  if (idx === 0) return num(D.balances?.current_cash);
+  return closeBalance(MONTHS[idx - 1]);
+}
+
+function totalIncome(m) {
+  const s = ms(m);
+  return num(s.salary)
+    + num(s.side_income_1_amount)
+    + num(s.side_income_2_amount);
+}
+
+function totalExpense(m) {
+  const s = ms(m);
+  return num(s.rakuten_bill) + num(s.paypay_bill) + num(s.paidy_bill)
+    + num(s.rent) + num(s.phone) + num(s.tax)
+    + num(s.misc_expense) + num(s.debt_repayment_actual);
+}
+
+function closeBalance(m) {
+  return openBalance(m) + totalIncome(m) - totalExpense(m);
+}
+
+function calcAll(m) {
+  const ob = openBalance(m);
+  const ti = totalIncome(m);
+  const te = totalExpense(m);
+  const cb = closeBalance(m);
+  const bf = num(D.meta?.buffer_floor || 100000);
+  const planned = num(D.repayment_schedule?.[m] || 0);
+  const actual  = num(ms(m).debt_repayment_actual || 0);
+  const diff    = actual - planned;
+  return { ob, ti, te, cb, bf, planned, actual, diff };
+}
+
+function bufferLabel(cb, bf) {
+  if (cb >= bf) return { text: '✓ 유지', cls: 'ok' };
+  if (cb >= 0)  return { text: '⚠ 하회', cls: 'warn' };
+  return { text: '❌ 마이너스', cls: 'neg' };
+}
+
+function repayDiffLabel(diff, planned) {
+  if (planned === 0) return { text: '계획 미설정', cls: 'muted' };
+  if (diff === 0)    return { text: '계획 일치', cls: 'muted' };
+  if (diff > 0)      return { text: '+' + yen(diff) + ' 초과', cls: 'pos' };
+  return { text: yen(Math.abs(diff)) + ' 부족', cls: 'warn' };
+}
+
+// ════════════════════════════════════════════════
+// 8. RENDER FUNCTIONS
+// ════════════════════════════════════════════════
+
+function updateSaveBadge() {
+  ['save-badge','backup-save-badge'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'save-badge ' + (hasSavedState ? 'badge-saved' : 'badge-default');
+    el.textContent = hasSavedState ? '저장됨' : '기본값 사용 중';
+  });
+  ['save-time','backup-save-time'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (lastSaveTime) {
+      const d = new Date(lastSaveTime);
+      el.textContent = d.toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    } else {
+      el.textContent = '';
+    }
+  });
+}
+
+function renderSummaryCards() {
+  const el = document.getElementById('summary-cards');
+  const revo = num(D.balances?.rakuten_revo_balance);
+  const bf   = num(D.meta?.buffer_floor || 100000);
+  const cb4  = closeBalance('2026-04');
+  const cb8  = closeBalance('2026-08');
+
+  // 8월 청산 여부 판단
+  const totalRepaid = MONTHS.reduce((a,m) => a + num(ms(m).debt_repayment_actual), 0);
+  const clearanceOk = totalRepaid >= revo;
+
+  el.innerHTML = `
+    <div class="s-card">
+      <div class="s-label">라쿠텐 리보 잔액</div>
+      <div class="s-value warn">${yen(revo)}</div>
+      <div class="s-sub">월 이자 ~${yen(Math.round(revo*0.18/12))}</div>
+    </div>
+    <div class="s-card">
+      <div class="s-label">4월말 예상 잔고</div>
+      <div class="s-value ${cb4 < bf ? 'neg' : 'pos'}">${yen(cb4)}</div>
+      <div class="s-sub">버퍼 ${yen(bf)} 기준 ${cb4 >= bf ? '✓ 유지' : '⚠ 하회'}</div>
+    </div>
+    <div class="s-card">
+      <div class="s-label">8월말 예상 잔고</div>
+      <div class="s-value ${cb8 >= 0 ? 'pos' : 'neg'}">${yen(cb8)}</div>
+      <div class="s-sub">상여 포함 최종 예상</div>
+    </div>
+    <div class="s-card">
+      <div class="s-label">8월 청산 목표</div>
+      <div class="s-value ${clearanceOk ? 'pos' : 'warn'}" style="font-size:14px;">
+        ${clearanceOk ? '✓ 달성 예정' : '⚠ 부족 가능'}
+      </div>
+      <div class="s-sub">총 상환 계획 ${yen(totalRepaid)}</div>
+    </div>
+  `;
+}
+
+// ─── 기준값 input 채우기 ───
+function fillBaseConfig() {
+  const el1 = document.getElementById('bc-current-cash');
+  const el2 = document.getElementById('bc-revo-balance');
+  const el3 = document.getElementById('bc-buffer-floor');
+  if (el1) el1.value = D.balances?.current_cash || 0;
+  if (el2) el2.value = D.balances?.rakuten_revo_balance || 0;
+  if (el3) el3.value = D.meta?.buffer_floor || 100000;
+}
+
+function updateBaseConfig(field, value) {
+  const v = parseFloat(value) || 0;
+  if (field === 'buffer_floor') {
+    if (!D.meta) D.meta = {};
+    D.meta.buffer_floor = v;
+  } else {
+    if (!D.balances) D.balances = {};
+    D.balances[field] = v;
+  }
+  updateCalcCells();
+  renderSummaryCards();
+  renderAlerts();
+  scheduleSave();
+}
+
+// ─── 시트 테이블 생성 ───
+function renderSheet() {
+  const table = document.getElementById('sheet-table');
+  if (!table) return;
+
+  const makeCell = (m, row) => {
+    const s = ms(m);
+    const val = s[row.field] !== undefined ? s[row.field] : (row.type === 'number' ? 0 : '');
+    if (row.type === 'number') {
+      const displayVal = val === 0 ? '' : val;
+      return `<td><input type="number" class="sheet-input" min="0" step="1000"
+        data-month="${m}" data-field="${row.field}"
+        value="${displayVal}" placeholder="0"
+        oninput="handleInput('${m}','${row.field}',this.value)"
+        onfocus="this.select()"></td>`;
+    } else {
+      return `<td><input type="text" class="sheet-input" data-month="${m}" data-field="${row.field}"
+        value="${escHtml(String(val))}" placeholder="—"
+        oninput="handleInput('${m}','${row.field}',this.value)"></td>`;
+    }
+  };
+
+  const makeCalcCell = (m, row) => {
+    return `<td><span class="calc-cell" id="calc-${m}-${row.field}">—</span></td>`;
+  };
+
+  const makeRows = (rows, isCalc) => rows.map(row => {
+    const trCls = row.cls || (isCalc ? 'row-calc' : '');
+    const cells = isCalc
+      ? MONTHS.map(m => makeCalcCell(m, row)).join('')
+      : MONTHS.map(m => makeCell(m, row)).join('');
+    return `<tr class="${trCls}"><td>${row.label}</td>${cells}</tr>`;
+  }).join('');
+
+  const sectionRow = (label) =>
+    `<tr class="row-section"><td colspan="${MONTHS.length + 1}">${label}</td></tr>`;
+
+  const thead = `<thead><tr>
+    <th style="width:130px;">항목</th>
+    ${MONTHS.map(m => `<th style="width:${Math.floor((820-16-16-130)/5)}px;">${M_LABEL[m]}</th>`).join('')}
+  </tr></thead>`;
+
+  const tbody = `<tbody>
+    ${sectionRow('수입')}
+    ${makeRows(INCOME_ROWS, false)}
+    ${sectionRow('지출')}
+    ${makeRows(EXPENSE_ROWS, false)}
+    ${sectionRow('기타')}
+    ${makeRows(META_ROWS, false)}
+    ${sectionRow('자동 계산')}
+    ${makeRows(CALC_ROWS, true)}
+  </tbody>`;
+
+  table.innerHTML = thead + tbody;
+  updateCalcCells();
+}
+
+// ─── 계산 셀만 갱신 (입력 중 focus 유지) ───
+function updateCalcCells() {
+  MONTHS.forEach(m => {
+    const { ob, ti, te, cb, bf, planned, diff } = calcAll(m);
+    const buf = bufferLabel(cb, bf);
+    const rd  = repayDiffLabel(diff, planned);
+
+    const set = (field, text, cls) => {
+      const el = document.getElementById(`calc-${m}-${field}`);
+      if (!el) return;
+      el.textContent = text;
+      el.className = 'calc-cell ' + (cls || '');
+    };
+
+    set('open_balance',  yen(ob), ob >= 0 ? 'info' : 'neg');
+    set('total_income',  yen(ti), 'pos');
+    set('total_expense', yen(te), 'neg');
+    set('close_balance', yen(cb), cb >= bf ? 'pos' : cb >= 0 ? 'warn' : 'neg');
+    set('buffer_status', buf.text, buf.cls);
+    set('repay_diff',    rd.text,  rd.cls);
+  });
+}
+
+// ─── 계획 상환액 input 채우기 ───
+function fillRepayScheduleInputs() {
+  const el = document.getElementById('repay-schedule-inputs');
+  if (!el) return;
+  el.innerHTML = MONTHS.map(m => {
+    const val = D.repayment_schedule?.[m] || 0;
+    return `<div class="rs-item">
+      <span class="rs-label">${M_LABEL[m]}</span>
+      <input type="number" class="rs-input" min="0" step="10000"
+        value="${val}" data-month="${m}"
+        onchange="updateRepaySchedule('${m}', this.value)">
+    </div>`;
+  }).join('');
+}
+
+// ─── 정산 탭 아코디언 ───
+function renderSettlements() {
+  const el = document.getElementById('settle-accordions');
+  if (!el) return;
+  el.innerHTML = '';
+
+  MONTHS.forEach((m, idx) => {
+    const s   = ms(m);
+    const { ob, ti, te, cb, bf, planned, actual, diff } = calcAll(m);
+    const buf = bufferLabel(cb, bf);
+    const rd  = repayDiffLabel(diff, planned);
+
+    const hasData = num(s.salary) > 0 || num(s.rakuten_bill) > 0 || num(s.rent) > 0;
+    let badgeCls = 'acc-badge-empty', badgeText = '미입력';
+    if (hasData) {
+      if (cb < 0)  { badgeCls = 'acc-badge-err';  badgeText = '마이너스'; }
+      else if (cb < bf) { badgeCls = 'acc-badge-warn'; badgeText = '버퍼 하회'; }
+      else { badgeCls = 'acc-badge-ok';  badgeText = '정상'; }
+    }
+
+    const incomeRows = [
+      s.salary                  ? `<tr><td class="lbl">급여</td><td class="val pos">+${yen(s.salary)}</td></tr>` : '',
+      s.side_income_1_amount    ? `<tr><td class="lbl sub">${s.side_income_1_name||'부수입①'}</td><td class="val pos">+${yen(s.side_income_1_amount)}</td></tr>` : '',
+      s.side_income_2_amount    ? `<tr><td class="lbl sub">${s.side_income_2_name||'부수입②'}</td><td class="val pos">+${yen(s.side_income_2_amount)}</td></tr>` : '',
+      `<tr class="total-row"><td class="lbl">총수입</td><td class="val pos">+${yen(ti)}</td></tr>`
+    ].join('');
+
+    const expItems = [
+      { label:'라쿠텐 카드', val:s.rakuten_bill },
+      { label:'PayPay 카드', val:s.paypay_bill },
+      { label:'Paidy',       val:s.paidy_bill },
+      { label:'야칭',         val:s.rent },
+      { label:'폰비',         val:s.phone },
+      { label:'세금',         val:s.tax },
+      { label:'기타지출',      val:s.misc_expense },
+      { label:'리보 상환',     val:s.debt_repayment_actual },
+    ];
+    const expenseRows = expItems
+      .filter(x => num(x.val) > 0)
+      .map(x => `<tr><td class="lbl">${x.label}</td><td class="val neg">−${yen(x.val)}</td></tr>`)
+      .join('') + `<tr class="total-row"><td class="lbl">총지출</td><td class="val neg">−${yen(te)}</td></tr>`;
+
+    const noteHtml = s.note
+      ? `<div class="notice notice-blue" style="margin-top:8px;"><span>✦</span><span style="margin-left:4px;">${escHtml(s.note)}</span></div>` : '';
+
+    const alertsHtml = cb < bf
+      ? `<div class="notice notice-${cb < 0 ? 'red':'warn'}" style="margin-top:6px;">
+          <span>${cb < 0 ? '❌' : '⚠'}</span>
+          <span style="margin-left:4px;">${cb < 0 ? '월말 잔고 마이너스' : '버퍼 하회'} — 이번 달 상환액 또는 지출값을 재검토하세요.</span>
+         </div>` : '';
+
+    const repayCompare = planned > 0
+      ? `<div style="font-size:11px;color:var(--text-3);margin-top:6px;">
+          계획 ${yen(planned)} → 실제 ${yen(actual)}
+          <span style="font-family:var(--mono);color:${diff < 0?'var(--amber)':diff>0?'var(--green)':'var(--text-3)'};">
+            (${rd.text})
+          </span>
+        </div>` : '';
+
+    const isOpen = idx === 0;
+    const div = document.createElement('div');
+    div.className = 'accordion';
+    div.innerHTML = `
+      <button class="accordion-header ${isOpen?'open':''}" onclick="toggleAccordion(this,'accb-${m}')">
+        <span class="acc-arrow ${isOpen?'open':''}">▶</span>
+        <span>${M_LABEL[m]} 정산</span>
+        <span class="acc-badge ${badgeCls}">${badgeText}</span>
+      </button>
+      <div class="accordion-body ${isOpen?'open':''}" id="accb-${m}">
+        <div class="accordion-inner">
+          <div class="settle-grid">
+            <div class="settle-block">
+              <div class="settle-block-label">월초 잔고</div>
+              <div class="settle-block-value info">${yen(ob)}</div>
+            </div>
+            <div class="settle-block">
+              <div class="settle-block-label">월말 잔고</div>
+              <div class="settle-block-value ${buf.cls}">${yen(cb)}</div>
+              <div class="settle-block-sub">${buf.text}</div>
+            </div>
+            <div class="settle-block">
+              <div class="settle-block-label">총수입</div>
+              <div class="settle-block-value pos">${yen(ti)}</div>
+            </div>
+            <div class="settle-block">
+              <div class="settle-block-label">총지출</div>
+              <div class="settle-block-value neg">${yen(te)}</div>
+            </div>
+          </div>
+          <hr class="div">
+          <table class="row-table">${incomeRows}</table>
+          <hr class="div">
+          <table class="row-table">${expenseRows}</table>
+          ${repayCompare}
+          ${noteHtml}
+          ${alertsHtml}
+        </div>
+      </div>
+    `;
+    el.appendChild(div);
+  });
+}
+
+// ─── 운영 경고 ───
+function renderAlerts() {
+  const el = document.getElementById('alert-list');
+  if (!el) return;
+  const alerts = [];
+
+  MONTHS.forEach(m => {
+    const { cb, bf, planned, actual, diff, te } = calcAll(m);
+    const s = ms(m);
+    const hasCardData = num(s.rakuten_bill) > 0 || num(s.paypay_bill) > 0 || num(s.paidy_bill) > 0;
+
+    if (cb < 0) alerts.push({
+      type:'red', month:m,
+      msg:`${M_LABEL[m]}말 잔고 마이너스 (${yen(cb)})`,
+      action:'이번 달 지출 또는 상환액을 재검토하세요.'
+    });
+    else if (cb < bf) alerts.push({
+      type:'warn', month:m,
+      msg:`${M_LABEL[m]}말 버퍼 하회 (${yen(cb)} < ${yen(bf)})`,
+      action:'이번 달 상환액을 줄이거나 급여외 소득을 반영하세요.'
+    });
+
+    if (planned > 0 && actual < planned && actual > 0) alerts.push({
+      type:'warn', month:m,
+      msg:`${M_LABEL[m]} 실제 상환액이 계획보다 적습니다 (${yen(actual)} / 계획 ${yen(planned)})`,
+      action:'다음 달 상환액을 늘려 일정을 보완하세요.'
+    });
+
+    if (num(s.salary) > 0 && !hasCardData && m !== '2026-08') alerts.push({
+      type:'info', month:m,
+      msg:`${M_LABEL[m]} 카드 청구 미입력`,
+      action:'카드 청구값이 비어 있어 월말 잔고가 낙관적으로 계산될 수 있습니다.'
+    });
+  });
+
+  // 8월 청산 가능성
+  const revo = num(D.balances?.rakuten_revo_balance);
+  const totalRepay = MONTHS.reduce((a,m) => a + num(ms(m).debt_repayment_actual), 0);
+  if (revo > 0 && totalRepay < revo) alerts.push({
+    type:'warn', month:null,
+    msg:`총 상환 계획 ${yen(totalRepay)} — 리보 잔액 ${yen(revo)}에 미달`,
+    action:'8월 상여 반영 여부를 확인하거나 월별 상환액을 조정하세요.'
+  });
+
+  if (alerts.length === 0) {
+    el.innerHTML = `<div style="font-size:11px;color:var(--text-3);margin-top:12px;">⟡ 입력된 데이터 기준 운영 경고 없음</div>`;
+    return;
+  }
+
+  const colorMap = { red:'var(--red)', warn:'var(--amber)', info:'var(--blue)' };
+  const bgMap    = { red:'var(--red-bg)', warn:'var(--amber-bg)', info:'var(--blue-bg)' };
+
+  el.innerHTML = alerts.map(a => `
+    <div class="alert-item" style="background:${bgMap[a.type]};">
+      <div class="alert-dot" style="background:${colorMap[a.type]};"></div>
+      <div>
+        <div class="alert-body" style="color:${colorMap[a.type]};">${a.msg}</div>
+        <div class="alert-action" style="color:${colorMap[a.type]};">${a.action}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ════════════════════════════════════════════════
+// 9. EVENT HANDLERS
+// ════════════════════════════════════════════════
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['sheet','settle','backup'][i] === tab);
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+
+  if (tab === 'settle') renderSettlements();
+  if (tab === 'backup') { fillRepayScheduleInputs(); updateSaveBadge(); fillGasUrlInput(); }
+}
+
+function fillGasUrlInput() {
+  const el = document.getElementById('gas-url-input');
+  if (el && !el.value) el.value = getGasUrl();
+}
+
+function saveGasUrl() {
+  const input = document.getElementById('gas-url-input');
+  const url = input?.value.trim();
+  if (!url || !url.startsWith('https://script.google.com')) {
+    showMsg('gas-url-msg', '❌ 올바른 GAS URL이 아닙니다', 'err', 4000);
+    return;
+  }
+  setGasUrl(url);
+  showMsg('gas-url-msg', '✓ URL 저장 완료 — 이 기기에만 저장됨 (코드에 포함 안 됨)', 'ok', 5000);
+}
+
+async function testGasConnection() {
+  const url = getGasUrl();
+  if (!url) { showMsg('gas-url-msg', '⚠ 먼저 URL을 저장하세요', 'warn', 3000); return; }
+  showMsg('gas-url-msg', '☁ 연결 테스트 중...', 'warn', 0);
+  try {
+    const res = await fetch(url, { method: 'GET' });
+    const json = await res.json();
+    if (json.status === 'ok' || json.status === 'empty') {
+      showMsg('gas-url-msg', '✓ Drive 연결 성공!', 'ok', 4000);
+    } else {
+      showMsg('gas-url-msg', '⚠ 응답 이상: ' + json.status, 'warn', 4000);
+    }
+  } catch(e) {
+    showMsg('gas-url-msg', '❌ 연결 실패: ' + e.message, 'err', 0);
+  }
+}
+
+function handleInput(m, field, value) {
+  if (!D.monthly_settlements) D.monthly_settlements = {};
+  if (!D.monthly_settlements[m]) D.monthly_settlements[m] = {};
+  const isNum = INCOME_ROWS.concat(EXPENSE_ROWS).find(r => r.field === field && r.type === 'number');
+  D.monthly_settlements[m][field] = isNum ? (parseFloat(value) || 0) : value;
+  updateCalcCells();
+  renderSummaryCards();
+  renderAlerts();
+  scheduleSave();
+}
+
+function updateRepaySchedule(m, value) {
+  if (!D.repayment_schedule) D.repayment_schedule = {};
+  D.repayment_schedule[m] = parseFloat(value) || 0;
+  updateCalcCells();
+  renderAlerts();
+  scheduleSave();
+}
+
+function toggleAccordion(btn, bodyId) {
+  const body  = document.getElementById(bodyId);
+  const arrow = btn.querySelector('.acc-arrow');
+  btn.classList.toggle('open');
+  arrow.classList.toggle('open');
+  body.classList.toggle('open');
+}
+
+function toggleCollapse(id, btn) {
+  document.getElementById(id).classList.toggle('open');
+  btn.classList.toggle('open');
+}
+
+async function saveManual() {
+  clearTimeout(_saveTimer);
+  showMsg('sheet-msg', '☁ Drive에 저장 중...', 'warn', 0);
+  const ok = await saveState();
+  updateSaveBadge();
+  showMsg('sheet-msg', ok ? '☁ Drive 저장 완료' : '⚠ Drive 실패 — 로컬 캐시는 저장됨', ok ? 'ok' : 'warn', 4000);
+}
+
+function copyCurrentState() {
+  const pretty = JSON.stringify(D, null, 2);
+  navigator.clipboard.writeText(pretty)
+    .then(() => showMsg('backup-msg', '✓ 현재 상태 JSON 복사 완료', 'ok', 3000))
+    .catch(e => showMsg('backup-msg', '❌ 복사 실패: ' + e.message, 'err', 0));
+}
+
+function downloadBackup() {
+  const today = new Date().toISOString().slice(0,10);
+  const blob  = new Blob([JSON.stringify(D, null, 2)], { type: 'application/json' });
+  const url   = URL.createObjectURL(blob);
+  const a     = document.createElement('a');
+  a.href = url; a.download = `finance_backup_${today}.json`; a.click();
+  URL.revokeObjectURL(url);
+  showMsg('backup-msg', '✓ 백업 다운로드 완료', 'ok', 3000);
+}
+
+function loadBackup(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      D = deepMerge(D, parsed);
+      showMsg('backup-msg', '☁ Drive에 저장 중...', 'warn', 0);
+      const ok = await saveState();
+      updateSaveBadge();
+      showMsg('backup-msg', ok ? '☁ 불러오기 + Drive 저장 완료' : '✓ 불러오기 완료 (Drive 저장 실패)', ok ? 'ok' : 'warn', 4000);
+      renderAll();
+    } catch (err) {
+      showMsg('backup-msg', '❌ 파일 오류: ' + err.message, 'err', 0);
+    }
+    input.value = '';
+  };
+  reader.onerror = () => { showMsg('backup-msg', '❌ 파일 읽기 실패', 'err', 0); input.value = ''; };
+  reader.readAsText(file);
+}
+
+async function resetAll() {
+  if (!confirm('저장된 데이터를 모두 초기화합니다. Drive에도 기본값으로 덮어씁니다. 계속하시겠습니까?')) return;
+  try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+  D = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  hasSavedState = false;
+  lastSaveTime  = null;
+  showMsg('backup-msg', '☁ Drive에 기본값으로 저장 중...', 'warn', 0);
+  const ok = await saveState();
+  updateSaveBadge();
+  showMsg('backup-msg', ok ? '✓ 초기화 완료 — Drive에 기본값 저장됨' : '✓ 초기화 완료 (Drive 저장 실패)', ok ? 'ok' : 'warn', 4000);
+  renderAll();
+}
+
+async function applyRawJSON() {
+  const raw = document.getElementById('json-raw-input')?.value.trim();
+  if (!raw) { showMsg('json-raw-msg', '⚠ 입력값 없음', 'warn', 3000); return; }
+  try {
+    const parsed = JSON.parse(raw);
+    D = deepMerge(D, parsed);
+    showMsg('json-raw-msg', '☁ Drive에 저장 중...', 'warn', 0);
+    const ok = await saveState();
+    updateSaveBadge();
+    showMsg('json-raw-msg', ok ? '☁ 적용 + Drive 저장 완료' : '✓ 적용 완료 (Drive 저장 실패)', ok ? 'ok' : 'warn', 4000);
+    renderAll();
+  } catch(e) {
+    showMsg('json-raw-msg', '❌ JSON 오류: ' + e.message, 'err', 0);
+  }
+}
+
+function showCurrentJSON() {
+  const el = document.getElementById('json-raw-input');
+  if (el) el.value = JSON.stringify(D, null, 2);
+}
+
+// ─── 유틸 ───
+function showMsg(id, text, type, clearMs) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const map = { ok:'msg-ok', err:'msg-err', warn:'msg-warn' };
+  el.className = 'sheet-msg ' + (map[type] || '');
+  el.textContent = text;
+  if (clearMs > 0) setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, clearMs);
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ════════════════════════════════════════════════
+// 10. INIT
+// ════════════════════════════════════════════════
+function renderAll() {
+  updateSaveBadge();
+  renderSummaryCards();
+  fillBaseConfig();
+  renderSheet();
+  renderAlerts();
+  fillRepayScheduleInputs();
+  if (_loadWarning) {
+    showMsg('sheet-msg', _loadWarning, 'warn', 0);
+    _loadWarning = null;
+  }
+}
+
+async function init() {
+  // 1) 기본값으로 우선 렌더 (빠른 초기 표시)
+  renderAll();
+  // 2) GAS에서 실제 데이터 불러오기
+  await loadFromGAS();
+  // 3) 불러온 데이터로 재렌더
+  renderAll();
+}
+
+init();
+</script>
+</body>
+</html>
