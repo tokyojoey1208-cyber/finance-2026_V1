@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>재무 대시보드 2026 v4 — 빚 청산 운영판</title>
+<title>재무 대시보드 2026 v6 — 운영 확장판</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -238,7 +238,7 @@ body {
 .collapsible-body { display: none; }
 .collapsible-body.open { display: block; }
 .file-input-hidden { display: none; }
-.repay-schedule-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.repay-schedule-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 6px; }
 .rs-item { display: flex; flex-direction: column; gap: 3px; }
 .rs-label { font-size: 10px; color: var(--text-3); }
 .rs-input {
@@ -265,8 +265,8 @@ hr.div { border: none; border-top: 0.5px solid var(--border); margin: 10px 0; }
 <div class="page-header">
   <div class="header-top">
     <div>
-      <div class="page-title">재무 대시보드 2026 v4</div>
-      <div class="page-sub">빚 청산 운영판 · 2026년 4월~8월 · 라쿠텐 리보 완납 목표</div>
+      <div class="page-title">재무 대시보드 2026 v6</div>
+      <div class="page-sub">운영 확장판 · 2026년 4월~2027년 3월 · 엔화/한화 동시 추적</div>
     </div>
     <div class="save-row">
       <span class="save-badge badge-default" id="save-badge">기본값</span>
@@ -291,9 +291,14 @@ hr.div { border: none; border-top: 0.5px solid var(--border); margin: 10px 0; }
   <!-- 기준값 설정 -->
   <div class="base-config">
     <div class="bc-item">
-      <span class="bc-label">4월 월초 잔고</span>
+      <span class="bc-label">4월 엔화 월초 잔고</span>
       <input type="number" class="bc-input" id="bc-current-cash"
         onchange="updateBaseConfig('current_cash', this.value)" min="0" step="10000">
+    </div>
+    <div class="bc-item">
+      <span class="bc-label">4월 한화 월초 잔고</span>
+      <input type="number" class="bc-input" id="bc-current-krw"
+        onchange="updateBaseConfig('current_krw', this.value)" min="0" step="10000">
     </div>
     <div class="bc-item">
       <span class="bc-label">리보 현재 잔액</span>
@@ -305,7 +310,7 @@ hr.div { border: none; border-top: 0.5px solid var(--border); margin: 10px 0; }
       <input type="number" class="bc-input" id="bc-buffer-floor"
         onchange="updateBaseConfig('buffer_floor', this.value)" min="0" step="10000">
     </div>
-    <span class="bc-note">← 이 값들이 전체 잔고 계산의 시작점</span>
+    <span class="bc-note">← 4월 시작값과 버퍼 기준을 여기서 잡으면 이후 월은 자동 이월</span>
   </div>
 
   <!-- 입력 시트 테이블 -->
@@ -332,6 +337,23 @@ hr.div { border: none; border-top: 0.5px solid var(--border); margin: 10px 0; }
 
 <!-- ═══ TAB 3: 백업 / 고급 관리 ═══ -->
 <div class="tab-content" id="tab-backup">
+
+  <!-- GAS URL 설정 -->
+  <div class="backup-section">
+    <div class="backup-section-title">☁ Drive 연결 설정 (GAS URL)</div>
+    <div style="font-size:11px;color:var(--text-3);margin-bottom:10px;">
+      처음 한 번만 입력하면 이 기기에 저장됩니다. GitHub 코드에는 포함되지 않습니다.
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/.../exec"
+        style="flex:1;min-width:200px;font-family:var(--mono);font-size:11px;
+               border:1px solid var(--border);border-radius:var(--radius-sm);
+               padding:6px 10px;outline:none;background:var(--surface);color:var(--text-1);">
+      <button class="btn btn-primary" onclick="saveGasUrl()">저장</button>
+      <button class="btn btn-ghost" onclick="testGasConnection()">연결 테스트</button>
+    </div>
+    <div class="json-msg" id="gas-url-msg"></div>
+  </div>
 
   <!-- 저장 상태 -->
   <div class="backup-section">
@@ -389,100 +411,168 @@ hr.div { border: none; border-top: 0.5px solid var(--border); margin: 10px 0; }
 <!-- /page -->
 </div>
 
+
 <script>
 // ════════════════════════════════════════════════
 // 1. CONSTANTS
 // ════════════════════════════════════════════════
 const STORAGE_KEY = 'finance_dashboard_2026_state';
-const GAS_URL = 'https://script.google.com/macros/s/AKfycby-czG9HdAbfBaN4jiKFDKLzqNylvblUs4u0v66lPoHkuRB6nmleAlEa9tOtaGTyuOI/exec';
-const MONTHS = ['2026-04','2026-05','2026-06','2026-07','2026-08'];
+const GAS_URL_KEY = 'finance_dashboard_2026_gas_url';
+function getGasUrl() { return localStorage.getItem(GAS_URL_KEY) || ''; }
+function setGasUrl(url) { localStorage.setItem(GAS_URL_KEY, url.trim()); }
+
+const MONTHS = ['2026-04','2026-05','2026-06','2026-07','2026-08','2026-09','2026-10','2026-11','2026-12','2027-01','2027-02','2027-03'];
+const DEBT_MONTHS = ['2026-04','2026-05','2026-06','2026-07','2026-08'];
+const FIRST_MONTH = MONTHS[0];
+const LAST_MONTH  = MONTHS[MONTHS.length - 1];
+const LAST_DEBT_MONTH = DEBT_MONTHS[DEBT_MONTHS.length - 1];
+
 const M_LABEL = {
-  '2026-04':'4월','2026-05':'5월','2026-06':'6월','2026-07':'7월','2026-08':'8월'
+  '2026-04':'4월','2026-05':'5월','2026-06':'6월','2026-07':'7월','2026-08':'8월',
+  '2026-09':'9월','2026-10':'10월','2026-11':'11월','2026-12':'12월',
+  '2027-01':'1월','2027-02':'2월','2027-03':'3월'
 };
 
 // 시트 행 정의
 const INCOME_ROWS = [
-  { field:'salary',               label:'급여',           type:'number' },
-  { field:'side_income_1_name',   label:'부수입① 이름',    type:'text'   },
-  { field:'side_income_1_amount', label:'부수입① 금액',    type:'number' },
-  { field:'side_income_2_name',   label:'부수입② 이름',    type:'text'   },
-  { field:'side_income_2_amount', label:'부수입② 금액',    type:'number' },
+  { field:'salary',               label:'급여',            type:'number' },
+  { field:'side_income_1_name',   label:'부수입① 이름',     type:'text'   },
+  { field:'side_income_1_amount', label:'부수입① 금액',     type:'number' },
+  { field:'side_income_2_name',   label:'부수입② 이름',     type:'text'   },
+  { field:'side_income_2_amount', label:'부수입② 금액',     type:'number' },
 ];
 const EXPENSE_ROWS = [
-  { field:'rakuten_bill',           label:'라쿠텐 카드',    type:'number' },
-  { field:'paypay_bill',            label:'PayPay 카드',    type:'number' },
+  { field:'rakuten_bill',           label:'라쿠텐 카드',     type:'number' },
+  { field:'paypay_bill',            label:'PayPay 카드',     type:'number' },
   { field:'paidy_bill',             label:'Paidy',           type:'number' },
-  { field:'rent',                   label:'야칭',            type:'number' },
-  { field:'phone',                  label:'폰비',            type:'number' },
-  { field:'tax',                    label:'세금',            type:'number' },
-  { field:'misc_expense',           label:'기타지출',        type:'number' },
-  { field:'debt_repayment_actual',  label:'리보 상환액',     type:'number', cls:'row-repay' },
+  { field:'rent',                   label:'야칭',             type:'number' },
+  { field:'phone',                  label:'폰비',             type:'number' },
+  { field:'tax',                    label:'세금',             type:'number' },
+  { field:'misc_expense',           label:'기타지출',         type:'number' },
+  { field:'debt_repayment_actual',  label:'리보 상환액',      type:'number', cls:'row-repay' },
+];
+const KRW_INCOME_ROWS = [
+  { field:'krw_exchange_deposit', label:'엔화 환전입금', type:'number' },
+  { field:'krw_side_income',      label:'한화 부수입',   type:'number' },
+];
+const KRW_EXPENSE_ROWS = [
+  { field:'krw_fixed_expense',    label:'고정비 지출',   type:'number' },
+  { field:'krw_family_remittance',label:'가족 송금',     type:'number' },
 ];
 const META_ROWS = [
-  { field:'note', label:'메모', type:'text' },
+  { field:'note',     label:'엔화 메모', type:'text' },
+  { field:'krw_note', label:'한화 메모', type:'text' },
 ];
 const CALC_ROWS = [
-  { field:'open_balance',  label:'월초 잔고',         cls:'' },
-  { field:'total_income',  label:'총수입',             cls:'' },
-  { field:'total_expense', label:'총지출',             cls:'' },
-  { field:'close_balance', label:'월말 잔고',          cls:'row-eom' },
-  { field:'buffer_status', label:'버퍼 상태',          cls:'' },
-  { field:'repay_diff',    label:'계획 vs 실제 상환',  cls:'' },
+  { field:'open_balance',      label:'엔화 월초 잔고',      cls:'' },
+  { field:'total_income',      label:'엔화 총수입',         cls:'' },
+  { field:'total_expense',     label:'엔화 총지출',         cls:'' },
+  { field:'close_balance',     label:'엔화 월말 잔고',      cls:'row-eom' },
+  { field:'buffer_status',     label:'엔화 버퍼 상태',      cls:'' },
+  { field:'repay_diff',        label:'계획 vs 실제 상환',   cls:'' },
+  { field:'krw_open_balance',  label:'한화 월초 잔고',      cls:'' },
+  { field:'krw_total_income',  label:'한화 총수입',         cls:'' },
+  { field:'krw_total_expense', label:'한화 총지출',         cls:'' },
+  { field:'krw_close_balance', label:'한화 월말 잔고',      cls:'' },
 ];
 
 // ════════════════════════════════════════════════
 // 2. DEFAULT DATA
 // ════════════════════════════════════════════════
+const DEFAULT_MONTH_TEMPLATE = {
+  salary: 0,
+  side_income_1_name: '', side_income_1_amount: 0,
+  side_income_2_name: '', side_income_2_amount: 0,
+  rakuten_bill: 0, paypay_bill: 0, paidy_bill: 0,
+  rent: 70550, phone: 3000, tax: 7000, misc_expense: 0,
+  debt_repayment_actual: 0,
+  krw_exchange_deposit: 0,
+  krw_side_income: 0,
+  krw_fixed_expense: 0,
+  krw_family_remittance: 0,
+  krw_note: '',
+  note: ''
+};
+
 const DEFAULT_DATA = {
   meta: { buffer_floor: 100000 },
-  balances: { current_cash: 499432, rakuten_revo_balance: 472656 },
+  balances: { current_cash: 499432, current_krw: 0, rakuten_revo_balance: 472656 },
   repayment_schedule: {
-    '2026-04': 100000, '2026-05': 100000,
-    '2026-06': 100000, '2026-07': 100000, '2026-08': 0
+    '2026-04': 100000, '2026-05': 100000, '2026-06': 100000, '2026-07': 100000,
+    '2026-08': 0
   },
   monthly_settlements: {
     '2026-04': {
+      ...DEFAULT_MONTH_TEMPLATE,
       salary: 250000,
       side_income_1_name: '체험단/리뷰', side_income_1_amount: 13784,
-      side_income_2_name: '', side_income_2_amount: 0,
       rakuten_bill: 259269, paypay_bill: 190044, paidy_bill: 8364,
       rent: 70550, phone: 3000, tax: 0, misc_expense: 0,
       debt_repayment_actual: 100000, note: '라쿠텐 리보 수동 상환 필요'
     },
-    '2026-05': {
-      salary: 260000,
-      side_income_1_name: '', side_income_1_amount: 0,
-      side_income_2_name: '', side_income_2_amount: 0,
-      rakuten_bill: 0, paypay_bill: 0, paidy_bill: 0,
-      rent: 70550, phone: 3000, tax: 7000, misc_expense: 0,
-      debt_repayment_actual: 100000, note: ''
-    },
-    '2026-06': {
-      salary: 260000,
-      side_income_1_name: '', side_income_1_amount: 0,
-      side_income_2_name: '', side_income_2_amount: 0,
-      rakuten_bill: 0, paypay_bill: 0, paidy_bill: 0,
-      rent: 70550, phone: 3000, tax: 7000, misc_expense: 0,
-      debt_repayment_actual: 100000, note: ''
-    },
-    '2026-07': {
-      salary: 260000,
-      side_income_1_name: '', side_income_1_amount: 0,
-      side_income_2_name: '', side_income_2_amount: 0,
-      rakuten_bill: 0, paypay_bill: 0, paidy_bill: 0,
-      rent: 70550, phone: 3000, tax: 7000, misc_expense: 0,
-      debt_repayment_actual: 100000, note: ''
-    },
+    '2026-05': { ...DEFAULT_MONTH_TEMPLATE, salary: 260000, debt_repayment_actual: 100000 },
+    '2026-06': { ...DEFAULT_MONTH_TEMPLATE, salary: 260000, debt_repayment_actual: 100000 },
+    '2026-07': { ...DEFAULT_MONTH_TEMPLATE, salary: 260000, debt_repayment_actual: 100000 },
     '2026-08': {
+      ...DEFAULT_MONTH_TEMPLATE,
       salary: 260000,
       side_income_1_name: '상여', side_income_1_amount: 490000,
-      side_income_2_name: '', side_income_2_amount: 0,
-      rakuten_bill: 0, paypay_bill: 0, paidy_bill: 0,
-      rent: 70550, phone: 3000, tax: 7000, misc_expense: 0,
       debt_repayment_actual: 0, note: '상여 수령 후 리보 잔액 전액 상환 예정'
-    }
+    },
+    '2026-09': { ...DEFAULT_MONTH_TEMPLATE, salary: 260000 },
+    '2026-10': { ...DEFAULT_MONTH_TEMPLATE, salary: 260000 },
+    '2026-11': { ...DEFAULT_MONTH_TEMPLATE, salary: 260000 },
+    '2026-12': { ...DEFAULT_MONTH_TEMPLATE, salary: 260000 },
+    '2027-01': { ...DEFAULT_MONTH_TEMPLATE, salary: 260000 },
+    '2027-02': { ...DEFAULT_MONTH_TEMPLATE, salary: 260000 },
+    '2027-03': { ...DEFAULT_MONTH_TEMPLATE, salary: 260000 }
   }
 };
+
+function normalizeData(data) {
+  const normalized = deepMerge(DEFAULT_DATA, data || {});
+  if (!normalized.meta) normalized.meta = {};
+  if (!normalized.balances) normalized.balances = {};
+  if (!normalized.monthly_settlements) normalized.monthly_settlements = {};
+  if (!normalized.repayment_schedule) normalized.repayment_schedule = {};
+
+  if (normalized.meta.buffer_floor === undefined || normalized.meta.buffer_floor === null) {
+    normalized.meta.buffer_floor = 100000;
+  }
+  if (normalized.balances.current_cash === undefined || normalized.balances.current_cash === null) {
+    normalized.balances.current_cash = 0;
+  }
+  if (normalized.balances.current_krw === undefined || normalized.balances.current_krw === null) {
+    normalized.balances.current_krw = 0;
+  }
+  if (normalized.balances.rakuten_revo_balance === undefined || normalized.balances.rakuten_revo_balance === null) {
+    normalized.balances.rakuten_revo_balance = 0;
+  }
+
+  MONTHS.forEach(m => {
+    const original = normalized.monthly_settlements[m] || {};
+    normalized.monthly_settlements[m] = { ...DEFAULT_MONTH_TEMPLATE, ...original };
+
+    // v5 -> v6 migration: old 한화 입금/출금 필드를 새 구조로 이관
+    if ((original.krw_exchange_deposit === undefined || original.krw_exchange_deposit === null) &&
+        (original.krw_inflow !== undefined && original.krw_inflow !== null)) {
+      normalized.monthly_settlements[m].krw_exchange_deposit = num(original.krw_inflow);
+    }
+    if ((original.krw_fixed_expense === undefined || original.krw_fixed_expense === null) &&
+        (original.krw_outflow !== undefined && original.krw_outflow !== null)) {
+      normalized.monthly_settlements[m].krw_fixed_expense = num(original.krw_outflow);
+    }
+    if ((original.krw_note === undefined || original.krw_note === null) && original.krw_memo !== undefined) {
+      normalized.monthly_settlements[m].krw_note = original.krw_memo || '';
+    }
+
+    if (normalized.repayment_schedule[m] === undefined || normalized.repayment_schedule[m] === null) {
+      normalized.repayment_schedule[m] = 0;
+    }
+  });
+
+  return normalized;
+}
 
 // ════════════════════════════════════════════════
 // 3. STATE VARS — loadState() 호출 전에 반드시 선언
@@ -494,27 +584,29 @@ let _saveTimer    = null;
 
 // ════════════════════════════════════════════════
 // 4. loadState — GAS에서 불러오기 (비동기)
-//    페이지 로드 시 init()에서 호출
 // ════════════════════════════════════════════════
 async function loadFromGAS() {
+  const url = getGasUrl();
+  if (!url) {
+    showMsg('sheet-msg', '⚙ GAS URL 미설정 — 백업/고급 탭에서 URL을 입력하세요', 'warn', 0);
+    return;
+  }
   try {
     showMsg('sheet-msg', '☁ Drive에서 불러오는 중...', 'warn', 0);
-    const res = await fetch(GAS_URL, { method: 'GET' });
+    const res = await fetch(url, { method: 'GET' });
     const json = await res.json();
     if (json.status === 'ok' && json.data) {
       hasSavedState = true;
       lastSaveTime  = json.data.__savedAt || null;
       delete json.data.__savedAt;
-      D = json.data;
+      D = normalizeData(json.data);
       showMsg('sheet-msg', '✓ Drive에서 불러오기 완료', 'ok', 3000);
     } else if (json.status === 'empty') {
-      // Drive에 파일 없음 → 기본값 유지
       showMsg('sheet-msg', '☁ Drive 저장본 없음 — 기본값 사용', 'warn', 4000);
     } else {
       throw new Error(json.message || '알 수 없는 오류');
     }
   } catch (e) {
-    // 네트워크 오류 등 → localStorage fallback
     _loadWarning = '⚠ Drive 연결 실패 — 로컬 캐시로 복구 시도 중';
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -523,30 +615,31 @@ async function loadFromGAS() {
         hasSavedState = true;
         lastSaveTime  = parsed.__savedAt || null;
         delete parsed.__savedAt;
-        D = parsed;
+        D = normalizeData(parsed);
       }
-    } catch (e2) { /* 로컬도 없으면 기본값 */ }
+    } catch (e2) { /* 기본값 유지 */ }
   }
 }
 
 // ════════════════════════════════════════════════
-// 5. D 초기화 — 기본값으로 시작, init()에서 GAS 로드
+// 5. D 초기화
 // ════════════════════════════════════════════════
-let D = JSON.parse(JSON.stringify(DEFAULT_DATA));
+let D = normalizeData(JSON.parse(JSON.stringify(DEFAULT_DATA)));
 
 // ════════════════════════════════════════════════
 // 6. SAVE — GAS POST + localStorage 이중 저장
 // ════════════════════════════════════════════════
 async function saveState() {
+  D = normalizeData(D);
   const toSave = JSON.parse(JSON.stringify(D));
   toSave.__savedAt = new Date().toISOString();
 
-  // localStorage에도 캐시 (오프라인 fallback용)
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave)); } catch(e) {}
 
-  // GAS로 전송
   try {
-    const res = await fetch(GAS_URL, {
+    const url = getGasUrl();
+    if (!url) return false;
+    const res = await fetch(url, {
       method: 'POST',
       body: JSON.stringify(toSave)
     });
@@ -559,10 +652,9 @@ async function saveState() {
       throw new Error(json.message || '저장 실패');
     }
   } catch (e) {
-    // GAS 실패해도 localStorage는 이미 저장됨
     hasSavedState = true;
     lastSaveTime  = toSave.__savedAt;
-    return false; // false = GAS 실패 (로컬은 OK)
+    return false;
   }
 }
 
@@ -593,7 +685,8 @@ function scheduleSave() {
 // ════════════════════════════════════════════════
 // 7. CALC HELPERS
 // ════════════════════════════════════════════════
-const yen = (n) => '¥' + Math.round(n).toLocaleString('ja-JP');
+const yen = (n) => '¥' + Math.round(num(n)).toLocaleString('ja-JP');
+const won = (n) => '₩' + Math.round(num(n)).toLocaleString('ko-KR');
 const num = (v) => parseFloat(v) || 0;
 const ms  = (m) => D.monthly_settlements?.[m] || {};
 
@@ -602,23 +695,35 @@ function openBalance(m) {
   if (idx === 0) return num(D.balances?.current_cash);
   return closeBalance(MONTHS[idx - 1]);
 }
-
 function totalIncome(m) {
   const s = ms(m);
-  return num(s.salary)
-    + num(s.side_income_1_amount)
-    + num(s.side_income_2_amount);
+  return num(s.salary) + num(s.side_income_1_amount) + num(s.side_income_2_amount);
 }
-
 function totalExpense(m) {
   const s = ms(m);
   return num(s.rakuten_bill) + num(s.paypay_bill) + num(s.paidy_bill)
     + num(s.rent) + num(s.phone) + num(s.tax)
     + num(s.misc_expense) + num(s.debt_repayment_actual);
 }
-
 function closeBalance(m) {
   return openBalance(m) + totalIncome(m) - totalExpense(m);
+}
+
+function openKrwBalance(m) {
+  const idx = MONTHS.indexOf(m);
+  if (idx === 0) return num(D.balances?.current_krw);
+  return closeKrwBalance(MONTHS[idx - 1]);
+}
+function totalKrwIncome(m) {
+  const s = ms(m);
+  return num(s.krw_exchange_deposit) + num(s.krw_side_income);
+}
+function totalKrwExpense(m) {
+  const s = ms(m);
+  return num(s.krw_fixed_expense) + num(s.krw_family_remittance);
+}
+function closeKrwBalance(m) {
+  return openKrwBalance(m) + totalKrwIncome(m) - totalKrwExpense(m);
 }
 
 function calcAll(m) {
@@ -627,10 +732,17 @@ function calcAll(m) {
   const te = totalExpense(m);
   const cb = closeBalance(m);
   const bf = num(D.meta?.buffer_floor || 100000);
+
+  const kob = openKrwBalance(m);
+  const kti = totalKrwIncome(m);
+  const kte = totalKrwExpense(m);
+  const kcb = closeKrwBalance(m);
+
   const planned = num(D.repayment_schedule?.[m] || 0);
   const actual  = num(ms(m).debt_repayment_actual || 0);
   const diff    = actual - planned;
-  return { ob, ti, te, cb, bf, planned, actual, diff };
+
+  return { ob, ti, te, cb, bf, planned, actual, diff, kob, kti, kte, kcb };
 }
 
 function bufferLabel(cb, bf) {
@@ -640,7 +752,7 @@ function bufferLabel(cb, bf) {
 }
 
 function repayDiffLabel(diff, planned) {
-  if (planned === 0) return { text: '계획 미설정', cls: 'muted' };
+  if (planned === 0) return { text: '계획 없음', cls: 'muted' };
   if (diff === 0)    return { text: '계획 일치', cls: 'muted' };
   if (diff > 0)      return { text: '+' + yen(diff) + ' 초과', cls: 'pos' };
   return { text: yen(Math.abs(diff)) + ' 부족', cls: 'warn' };
@@ -649,7 +761,6 @@ function repayDiffLabel(diff, planned) {
 // ════════════════════════════════════════════════
 // 8. RENDER FUNCTIONS
 // ════════════════════════════════════════════════
-
 function updateSaveBadge() {
   ['save-badge','backup-save-badge'].forEach(id => {
     const el = document.getElementById(id);
@@ -673,45 +784,42 @@ function renderSummaryCards() {
   const el = document.getElementById('summary-cards');
   const revo = num(D.balances?.rakuten_revo_balance);
   const bf   = num(D.meta?.buffer_floor || 100000);
-  const cb4  = closeBalance('2026-04');
-  const cb8  = closeBalance('2026-08');
-
-  // 8월 청산 여부 판단
-  const totalRepaid = MONTHS.reduce((a,m) => a + num(ms(m).debt_repayment_actual), 0);
-  const clearanceOk = totalRepaid >= revo;
+  const cbFirst = closeBalance(FIRST_MONTH);
+  const cbLast  = closeBalance(LAST_MONTH);
+  const krwLast = closeKrwBalance(LAST_MONTH);
+  const debtPlanned = DEBT_MONTHS.reduce((a,m) => a + num(D.repayment_schedule?.[m] || 0), 0);
 
   el.innerHTML = `
     <div class="s-card">
       <div class="s-label">라쿠텐 리보 잔액</div>
-      <div class="s-value warn">${yen(revo)}</div>
-      <div class="s-sub">월 이자 ~${yen(Math.round(revo*0.18/12))}</div>
+      <div class="s-value ${revo > 0 ? 'warn' : 'pos'}">${yen(revo)}</div>
+      <div class="s-sub">계획 상환 합계 ${yen(debtPlanned)}</div>
     </div>
     <div class="s-card">
-      <div class="s-label">4월말 예상 잔고</div>
-      <div class="s-value ${cb4 < bf ? 'neg' : 'pos'}">${yen(cb4)}</div>
-      <div class="s-sub">버퍼 ${yen(bf)} 기준 ${cb4 >= bf ? '✓ 유지' : '⚠ 하회'}</div>
+      <div class="s-label">${M_LABEL[FIRST_MONTH]}말 엔화 잔고</div>
+      <div class="s-value ${cbFirst < bf ? 'neg' : 'pos'}">${yen(cbFirst)}</div>
+      <div class="s-sub">버퍼 ${yen(bf)} 기준 ${cbFirst >= bf ? '✓ 유지' : '⚠ 하회'}</div>
     </div>
     <div class="s-card">
-      <div class="s-label">8월말 예상 잔고</div>
-      <div class="s-value ${cb8 >= 0 ? 'pos' : 'neg'}">${yen(cb8)}</div>
-      <div class="s-sub">상여 포함 최종 예상</div>
+      <div class="s-label">${M_LABEL[LAST_MONTH]}말 엔화 잔고</div>
+      <div class="s-value ${cbLast >= 0 ? 'pos' : 'neg'}">${yen(cbLast)}</div>
+      <div class="s-sub">최종 운영 잔고</div>
     </div>
     <div class="s-card">
-      <div class="s-label">8월 청산 목표</div>
-      <div class="s-value ${clearanceOk ? 'pos' : 'warn'}" style="font-size:14px;">
-        ${clearanceOk ? '✓ 달성 예정' : '⚠ 부족 가능'}
-      </div>
-      <div class="s-sub">총 상환 계획 ${yen(totalRepaid)}</div>
+      <div class="s-label">${M_LABEL[LAST_MONTH]}말 한화 잔고</div>
+      <div class="s-value ${krwLast >= 0 ? 'info' : 'neg'}">${won(krwLast)}</div>
+      <div class="s-sub">한화 추적 최종 잔고</div>
     </div>
   `;
 }
 
-// ─── 기준값 input 채우기 ───
 function fillBaseConfig() {
   const el1 = document.getElementById('bc-current-cash');
+  const elK = document.getElementById('bc-current-krw');
   const el2 = document.getElementById('bc-revo-balance');
   const el3 = document.getElementById('bc-buffer-floor');
   if (el1) el1.value = D.balances?.current_cash || 0;
+  if (elK) elK.value = D.balances?.current_krw || 0;
   if (el2) el2.value = D.balances?.rakuten_revo_balance || 0;
   if (el3) el3.value = D.meta?.buffer_floor || 100000;
 }
@@ -731,10 +839,18 @@ function updateBaseConfig(field, value) {
   scheduleSave();
 }
 
-// ─── 시트 테이블 생성 ───
 function renderSheet() {
   const table = document.getElementById('sheet-table');
   if (!table) return;
+
+  const numberFields = new Set(
+    INCOME_ROWS
+      .concat(EXPENSE_ROWS)
+      .concat(KRW_INCOME_ROWS)
+      .concat(KRW_EXPENSE_ROWS)
+      .filter(r => r.type === 'number')
+      .map(r => r.field)
+  );
 
   const makeCell = (m, row) => {
     const s = ms(m);
@@ -746,16 +862,13 @@ function renderSheet() {
         value="${displayVal}" placeholder="0"
         oninput="handleInput('${m}','${row.field}',this.value)"
         onfocus="this.select()"></td>`;
-    } else {
-      return `<td><input type="text" class="sheet-input" data-month="${m}" data-field="${row.field}"
-        value="${escHtml(String(val))}" placeholder="—"
-        oninput="handleInput('${m}','${row.field}',this.value)"></td>`;
     }
+    return `<td><input type="text" class="sheet-input" data-month="${m}" data-field="${row.field}"
+      value="${escHtml(String(val))}" placeholder="—"
+      oninput="handleInput('${m}','${row.field}',this.value)"></td>`;
   };
 
-  const makeCalcCell = (m, row) => {
-    return `<td><span class="calc-cell" id="calc-${m}-${row.field}">—</span></td>`;
-  };
+  const makeCalcCell = (m, row) => `<td><span class="calc-cell" id="calc-${m}-${row.field}">—</span></td>`;
 
   const makeRows = (rows, isCalc) => rows.map(row => {
     const trCls = row.cls || (isCalc ? 'row-calc' : '');
@@ -765,20 +878,24 @@ function renderSheet() {
     return `<tr class="${trCls}"><td>${row.label}</td>${cells}</tr>`;
   }).join('');
 
-  const sectionRow = (label) =>
-    `<tr class="row-section"><td colspan="${MONTHS.length + 1}">${label}</td></tr>`;
+  const sectionRow = (label) => `<tr class="row-section"><td colspan="${MONTHS.length + 1}">${label}</td></tr>`;
 
+  const colWidth = Math.max(72, Math.floor((820 - 16 - 16 - 130) / MONTHS.length));
   const thead = `<thead><tr>
     <th style="width:130px;">항목</th>
-    ${MONTHS.map(m => `<th style="width:${Math.floor((820-16-16-130)/5)}px;">${M_LABEL[m]}</th>`).join('')}
+    ${MONTHS.map(m => `<th style="width:${colWidth}px;">${M_LABEL[m]}</th>`).join('')}
   </tr></thead>`;
 
   const tbody = `<tbody>
-    ${sectionRow('수입')}
+    ${sectionRow('엔화 수입')}
     ${makeRows(INCOME_ROWS, false)}
-    ${sectionRow('지출')}
+    ${sectionRow('엔화 지출')}
     ${makeRows(EXPENSE_ROWS, false)}
-    ${sectionRow('기타')}
+    ${sectionRow('한화 수입')}
+    ${makeRows(KRW_INCOME_ROWS, false)}
+    ${sectionRow('한화 지출')}
+    ${makeRows(KRW_EXPENSE_ROWS, false)}
+    ${sectionRow('메모')}
     ${makeRows(META_ROWS, false)}
     ${sectionRow('자동 계산')}
     ${makeRows(CALC_ROWS, true)}
@@ -788,10 +905,9 @@ function renderSheet() {
   updateCalcCells();
 }
 
-// ─── 계산 셀만 갱신 (입력 중 focus 유지) ───
 function updateCalcCells() {
   MONTHS.forEach(m => {
-    const { ob, ti, te, cb, bf, planned, diff } = calcAll(m);
+    const { ob, ti, te, cb, bf, planned, diff, kob, kti, kte, kcb } = calcAll(m);
     const buf = bufferLabel(cb, bf);
     const rd  = repayDiffLabel(diff, planned);
 
@@ -802,20 +918,24 @@ function updateCalcCells() {
       el.className = 'calc-cell ' + (cls || '');
     };
 
-    set('open_balance',  yen(ob), ob >= 0 ? 'info' : 'neg');
-    set('total_income',  yen(ti), 'pos');
-    set('total_expense', yen(te), 'neg');
-    set('close_balance', yen(cb), cb >= bf ? 'pos' : cb >= 0 ? 'warn' : 'neg');
-    set('buffer_status', buf.text, buf.cls);
-    set('repay_diff',    rd.text,  rd.cls);
+    set('open_balance',      yen(ob), ob >= 0 ? 'info' : 'neg');
+    set('total_income',      yen(ti), 'pos');
+    set('total_expense',     yen(te), 'neg');
+    set('close_balance',     yen(cb), cb >= bf ? 'pos' : cb >= 0 ? 'warn' : 'neg');
+    set('buffer_status',     buf.text, buf.cls);
+    set('repay_diff',        DEBT_MONTHS.includes(m) ? rd.text : '—', DEBT_MONTHS.includes(m) ? rd.cls : 'muted');
+    set('krw_open_balance',  won(kob), 'info');
+    set('krw_total_income',  won(kti), 'pos');
+    set('krw_total_expense', won(kte), 'neg');
+    set('krw_close_balance', won(kcb), kcb >= 0 ? 'info' : 'neg');
   });
 }
 
-// ─── 계획 상환액 input 채우기 ───
+
 function fillRepayScheduleInputs() {
   const el = document.getElementById('repay-schedule-inputs');
   if (!el) return;
-  el.innerHTML = MONTHS.map(m => {
+  el.innerHTML = DEBT_MONTHS.map(m => {
     const val = D.repayment_schedule?.[m] || 0;
     return `<div class="rs-item">
       <span class="rs-label">${M_LABEL[m]}</span>
@@ -826,7 +946,6 @@ function fillRepayScheduleInputs() {
   }).join('');
 }
 
-// ─── 정산 탭 아코디언 ───
 function renderSettlements() {
   const el = document.getElementById('settle-accordions');
   if (!el) return;
@@ -834,22 +953,26 @@ function renderSettlements() {
 
   MONTHS.forEach((m, idx) => {
     const s   = ms(m);
-    const { ob, ti, te, cb, bf, planned, actual, diff } = calcAll(m);
+    const { ob, ti, te, cb, bf, planned, actual, diff, kob, kti, kte, kcb } = calcAll(m);
     const buf = bufferLabel(cb, bf);
     const rd  = repayDiffLabel(diff, planned);
 
-    const hasData = num(s.salary) > 0 || num(s.rakuten_bill) > 0 || num(s.rent) > 0;
+    const hasData =
+      num(s.salary) > 0 || num(s.rakuten_bill) > 0 || num(s.rent) > 0 ||
+      num(s.krw_exchange_deposit) > 0 || num(s.krw_side_income) > 0 ||
+      num(s.krw_fixed_expense) > 0 || num(s.krw_family_remittance) > 0;
+
     let badgeCls = 'acc-badge-empty', badgeText = '미입력';
     if (hasData) {
-      if (cb < 0)  { badgeCls = 'acc-badge-err';  badgeText = '마이너스'; }
-      else if (cb < bf) { badgeCls = 'acc-badge-warn'; badgeText = '버퍼 하회'; }
-      else { badgeCls = 'acc-badge-ok';  badgeText = '정상'; }
+      if (cb < 0 || kcb < 0)  { badgeCls = 'acc-badge-err';  badgeText = '점검 필요'; }
+      else if (cb < bf)       { badgeCls = 'acc-badge-warn'; badgeText = '버퍼 하회'; }
+      else                    { badgeCls = 'acc-badge-ok';   badgeText = '정상'; }
     }
 
     const incomeRows = [
-      s.salary                  ? `<tr><td class="lbl">급여</td><td class="val pos">+${yen(s.salary)}</td></tr>` : '',
-      s.side_income_1_amount    ? `<tr><td class="lbl sub">${s.side_income_1_name||'부수입①'}</td><td class="val pos">+${yen(s.side_income_1_amount)}</td></tr>` : '',
-      s.side_income_2_amount    ? `<tr><td class="lbl sub">${s.side_income_2_name||'부수입②'}</td><td class="val pos">+${yen(s.side_income_2_amount)}</td></tr>` : '',
+      s.salary               ? `<tr><td class="lbl">급여</td><td class="val pos">+${yen(s.salary)}</td></tr>` : '',
+      s.side_income_1_amount ? `<tr><td class="lbl sub">${escHtml(s.side_income_1_name||'부수입①')}</td><td class="val pos">+${yen(s.side_income_1_amount)}</td></tr>` : '',
+      s.side_income_2_amount ? `<tr><td class="lbl sub">${escHtml(s.side_income_2_name||'부수입②')}</td><td class="val pos">+${yen(s.side_income_2_amount)}</td></tr>` : '',
       `<tr class="total-row"><td class="lbl">총수입</td><td class="val pos">+${yen(ti)}</td></tr>`
     ].join('');
 
@@ -868,16 +991,38 @@ function renderSettlements() {
       .map(x => `<tr><td class="lbl">${x.label}</td><td class="val neg">−${yen(x.val)}</td></tr>`)
       .join('') + `<tr class="total-row"><td class="lbl">총지출</td><td class="val neg">−${yen(te)}</td></tr>`;
 
+    const krwIncomeRows = [
+      num(s.krw_exchange_deposit) ? `<tr><td class="lbl">엔화 환전입금</td><td class="val pos">+${won(s.krw_exchange_deposit)}</td></tr>` : '',
+      num(s.krw_side_income) ? `<tr><td class="lbl">한화 부수입</td><td class="val pos">+${won(s.krw_side_income)}</td></tr>` : '',
+      `<tr class="total-row"><td class="lbl">한화 총수입</td><td class="val pos">+${won(kti)}</td></tr>`
+    ].join('');
+
+    const krwExpenseRows = [
+      num(s.krw_fixed_expense) ? `<tr><td class="lbl">고정비 지출</td><td class="val neg">−${won(s.krw_fixed_expense)}</td></tr>` : '',
+      num(s.krw_family_remittance) ? `<tr><td class="lbl">가족 송금</td><td class="val neg">−${won(s.krw_family_remittance)}</td></tr>` : '',
+      `<tr class="total-row"><td class="lbl">한화 총지출</td><td class="val neg">−${won(kte)}</td></tr>`
+    ].join('');
+
     const noteHtml = s.note
-      ? `<div class="notice notice-blue" style="margin-top:8px;"><span>✦</span><span style="margin-left:4px;">${escHtml(s.note)}</span></div>` : '';
+      ? `<div class="notice notice-blue" style="margin-top:8px;"><span>✦</span><span style="margin-left:4px;">엔화 메모 · ${escHtml(s.note)}</span></div>` : '';
+    const krwNoteHtml = s.krw_note
+      ? `<div class="notice notice-blue" style="margin-top:8px;"><span>✦</span><span style="margin-left:4px;">한화 메모 · ${escHtml(s.krw_note)}</span></div>` : '';
 
-    const alertsHtml = cb < bf
-      ? `<div class="notice notice-${cb < 0 ? 'red':'warn'}" style="margin-top:6px;">
-          <span>${cb < 0 ? '❌' : '⚠'}</span>
-          <span style="margin-left:4px;">${cb < 0 ? '월말 잔고 마이너스' : '버퍼 하회'} — 이번 달 상환액 또는 지출값을 재검토하세요.</span>
-         </div>` : '';
+    const alerts = [];
+    if (cb < bf) alerts.push(
+      `<div class="notice notice-${cb < 0 ? 'red':'warn'}" style="margin-top:6px;">
+        <span>${cb < 0 ? '❌' : '⚠'}</span>
+        <span style="margin-left:4px;">${cb < 0 ? '엔화 월말 잔고 마이너스' : '엔화 버퍼 하회'} — 이번 달 지출 또는 상환액을 재검토하세요.</span>
+      </div>`
+    );
+    if (kcb < 0) alerts.push(
+      `<div class="notice notice-red" style="margin-top:6px;">
+        <span>❌</span>
+        <span style="margin-left:4px;">한화 월말 잔고 마이너스 — 송금/입금 값을 다시 확인하세요.</span>
+      </div>`
+    );
 
-    const repayCompare = planned > 0
+    const repayCompare = (DEBT_MONTHS.includes(m) && planned > 0)
       ? `<div style="font-size:11px;color:var(--text-3);margin-top:6px;">
           계획 ${yen(planned)} → 실제 ${yen(actual)}
           <span style="font-family:var(--mono);color:${diff < 0?'var(--amber)':diff>0?'var(--green)':'var(--text-3)'};">
@@ -898,21 +1043,22 @@ function renderSettlements() {
         <div class="accordion-inner">
           <div class="settle-grid">
             <div class="settle-block">
-              <div class="settle-block-label">월초 잔고</div>
+              <div class="settle-block-label">엔화 월초 잔고</div>
               <div class="settle-block-value info">${yen(ob)}</div>
             </div>
             <div class="settle-block">
-              <div class="settle-block-label">월말 잔고</div>
+              <div class="settle-block-label">엔화 월말 잔고</div>
               <div class="settle-block-value ${buf.cls}">${yen(cb)}</div>
               <div class="settle-block-sub">${buf.text}</div>
             </div>
             <div class="settle-block">
-              <div class="settle-block-label">총수입</div>
-              <div class="settle-block-value pos">${yen(ti)}</div>
+              <div class="settle-block-label">한화 월초 잔고</div>
+              <div class="settle-block-value info">${won(kob)}</div>
             </div>
             <div class="settle-block">
-              <div class="settle-block-label">총지출</div>
-              <div class="settle-block-value neg">${yen(te)}</div>
+              <div class="settle-block-label">한화 월말 잔고</div>
+              <div class="settle-block-value ${kcb >= 0 ? 'info' : 'neg'}">${won(kcb)}</div>
+              <div class="settle-block-sub">${kcb >= 0 ? '이월 가능' : '부족'}</div>
             </div>
           </div>
           <hr class="div">
@@ -920,8 +1066,13 @@ function renderSettlements() {
           <hr class="div">
           <table class="row-table">${expenseRows}</table>
           ${repayCompare}
+          <hr class="div">
+          <table class="row-table">${krwIncomeRows}</table>
+          <hr class="div">
+          <table class="row-table">${krwExpenseRows}</table>
           ${noteHtml}
-          ${alertsHtml}
+          ${krwNoteHtml}
+          ${alerts.join('')}
         </div>
       </div>
     `;
@@ -929,49 +1080,65 @@ function renderSettlements() {
   });
 }
 
-// ─── 운영 경고 ───
+
 function renderAlerts() {
   const el = document.getElementById('alert-list');
   if (!el) return;
   const alerts = [];
 
   MONTHS.forEach(m => {
-    const { cb, bf, planned, actual, diff, te } = calcAll(m);
+    const { cb, bf, planned, actual, kcb } = calcAll(m);
     const s = ms(m);
     const hasCardData = num(s.rakuten_bill) > 0 || num(s.paypay_bill) > 0 || num(s.paidy_bill) > 0;
 
-    if (cb < 0) alerts.push({
-      type:'red', month:m,
-      msg:`${M_LABEL[m]}말 잔고 마이너스 (${yen(cb)})`,
-      action:'이번 달 지출 또는 상환액을 재검토하세요.'
-    });
-    else if (cb < bf) alerts.push({
-      type:'warn', month:m,
-      msg:`${M_LABEL[m]}말 버퍼 하회 (${yen(cb)} < ${yen(bf)})`,
-      action:'이번 달 상환액을 줄이거나 급여외 소득을 반영하세요.'
-    });
+    if (cb < 0) {
+      alerts.push({
+        type:'red',
+        msg:`${M_LABEL[m]}말 엔화 잔고 마이너스 (${yen(cb)})`,
+        action:'이번 달 지출 또는 상환액을 재검토하세요.'
+      });
+    } else if (cb < bf) {
+      alerts.push({
+        type:'warn',
+        msg:`${M_LABEL[m]}말 엔화 버퍼 하회 (${yen(cb)} < ${yen(bf)})`,
+        action:'이번 달 상환액을 줄이거나 추가 수입을 반영하세요.'
+      });
+    }
 
-    if (planned > 0 && actual < planned && actual > 0) alerts.push({
-      type:'warn', month:m,
-      msg:`${M_LABEL[m]} 실제 상환액이 계획보다 적습니다 (${yen(actual)} / 계획 ${yen(planned)})`,
-      action:'다음 달 상환액을 늘려 일정을 보완하세요.'
-    });
+    if (kcb < 0) {
+      alerts.push({
+        type:'red',
+        msg:`${M_LABEL[m]}말 한화 잔고 마이너스 (${won(kcb)})`,
+        action:'한화 지출값, 가족 송금액, 또는 시작 잔고를 다시 확인하세요.'
+      });
+    }
 
-    if (num(s.salary) > 0 && !hasCardData && m !== '2026-08') alerts.push({
-      type:'info', month:m,
-      msg:`${M_LABEL[m]} 카드 청구 미입력`,
-      action:'카드 청구값이 비어 있어 월말 잔고가 낙관적으로 계산될 수 있습니다.'
-    });
+    if (DEBT_MONTHS.includes(m) && planned > 0 && actual < planned && actual > 0) {
+      alerts.push({
+        type:'warn',
+        msg:`${M_LABEL[m]} 실제 상환액이 계획보다 적습니다 (${yen(actual)} / 계획 ${yen(planned)})`,
+        action:'다음 달 상환액을 늘려 일정을 보완하세요.'
+      });
+    }
+
+    if (DEBT_MONTHS.includes(m) && num(s.salary) > 0 && !hasCardData && m !== LAST_DEBT_MONTH) {
+      alerts.push({
+        type:'info',
+        msg:`${M_LABEL[m]} 카드 청구 미입력`,
+        action:'카드 청구값이 비어 있어 월말 잔고가 낙관적으로 계산될 수 있습니다.'
+      });
+    }
   });
 
-  // 8월 청산 가능성
   const revo = num(D.balances?.rakuten_revo_balance);
-  const totalRepay = MONTHS.reduce((a,m) => a + num(ms(m).debt_repayment_actual), 0);
-  if (revo > 0 && totalRepay < revo) alerts.push({
-    type:'warn', month:null,
-    msg:`총 상환 계획 ${yen(totalRepay)} — 리보 잔액 ${yen(revo)}에 미달`,
-    action:'8월 상여 반영 여부를 확인하거나 월별 상환액을 조정하세요.'
-  });
+  const totalDebtRepay = DEBT_MONTHS.reduce((a,m) => a + num(ms(m).debt_repayment_actual), 0);
+  if (revo > 0 && totalDebtRepay < revo) {
+    alerts.push({
+      type:'warn',
+      msg:`총 상환 실적 ${yen(totalDebtRepay)} — 리보 잔액 ${yen(revo)}에 미달`,
+      action:'8월 상여 반영 여부를 확인하거나 4~8월 상환액을 조정하세요.'
+    });
+  }
 
   if (alerts.length === 0) {
     el.innerHTML = `<div style="font-size:11px;color:var(--text-3);margin-top:12px;">⟡ 입력된 데이터 기준 운영 경고 없음</div>`;
@@ -995,7 +1162,6 @@ function renderAlerts() {
 // ════════════════════════════════════════════════
 // 9. EVENT HANDLERS
 // ════════════════════════════════════════════════
-
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach((b,i) => {
     b.classList.toggle('active', ['sheet','settle','backup'][i] === tab);
@@ -1003,21 +1169,61 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
 
-  // 탭 진입 시 렌더
   if (tab === 'settle') renderSettlements();
-  if (tab === 'backup') { fillRepayScheduleInputs(); updateSaveBadge(); }
+  if (tab === 'backup') { fillRepayScheduleInputs(); updateSaveBadge(); fillGasUrlInput(); }
+}
+
+function fillGasUrlInput() {
+  const el = document.getElementById('gas-url-input');
+  if (el && !el.value) el.value = getGasUrl();
+}
+
+function saveGasUrl() {
+  const input = document.getElementById('gas-url-input');
+  const url = input?.value.trim();
+  if (!url || !url.startsWith('https://script.google.com')) {
+    showMsg('gas-url-msg', '❌ 올바른 GAS URL이 아닙니다', 'err', 4000);
+    return;
+  }
+  setGasUrl(url);
+  showMsg('gas-url-msg', '✓ URL 저장 완료 — 이 기기에만 저장됨 (코드에 포함 안 됨)', 'ok', 5000);
+}
+
+async function testGasConnection() {
+  const url = getGasUrl();
+  if (!url) { showMsg('gas-url-msg', '⚠ 먼저 URL을 저장하세요', 'warn', 3000); return; }
+  showMsg('gas-url-msg', '☁ 연결 테스트 중...', 'warn', 0);
+  try {
+    const res = await fetch(url, { method: 'GET' });
+    const json = await res.json();
+    if (json.status === 'ok' || json.status === 'empty') {
+      showMsg('gas-url-msg', '✓ Drive 연결 성공!', 'ok', 4000);
+    } else {
+      showMsg('gas-url-msg', '⚠ 응답 이상: ' + json.status, 'warn', 4000);
+    }
+  } catch(e) {
+    showMsg('gas-url-msg', '❌ 연결 실패: ' + e.message, 'err', 0);
+  }
 }
 
 function handleInput(m, field, value) {
   if (!D.monthly_settlements) D.monthly_settlements = {};
-  if (!D.monthly_settlements[m]) D.monthly_settlements[m] = {};
-  const isNum = INCOME_ROWS.concat(EXPENSE_ROWS).find(r => r.field === field && r.type === 'number');
-  D.monthly_settlements[m][field] = isNum ? (parseFloat(value) || 0) : value;
+  if (!D.monthly_settlements[m]) D.monthly_settlements[m] = { ...DEFAULT_MONTH_TEMPLATE };
+  const numberFields = new Set(
+    INCOME_ROWS
+      .concat(EXPENSE_ROWS)
+      .concat(KRW_INCOME_ROWS)
+      .concat(KRW_EXPENSE_ROWS)
+      .filter(r => r.type === 'number')
+      .map(r => r.field)
+  );
+  D.monthly_settlements[m][field] = numberFields.has(field) ? (parseFloat(value) || 0) : value;
   updateCalcCells();
   renderSummaryCards();
   renderAlerts();
   scheduleSave();
 }
+
 
 function updateRepaySchedule(m, value) {
   if (!D.repayment_schedule) D.repayment_schedule = {};
@@ -1072,7 +1278,7 @@ function loadBackup(input) {
   reader.onload = async (e) => {
     try {
       const parsed = JSON.parse(e.target.result);
-      D = deepMerge(D, parsed);
+      D = normalizeData(deepMerge(D, parsed));
       showMsg('backup-msg', '☁ Drive에 저장 중...', 'warn', 0);
       const ok = await saveState();
       updateSaveBadge();
@@ -1090,7 +1296,7 @@ function loadBackup(input) {
 async function resetAll() {
   if (!confirm('저장된 데이터를 모두 초기화합니다. Drive에도 기본값으로 덮어씁니다. 계속하시겠습니까?')) return;
   try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
-  D = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  D = normalizeData(JSON.parse(JSON.stringify(DEFAULT_DATA)));
   hasSavedState = false;
   lastSaveTime  = null;
   showMsg('backup-msg', '☁ Drive에 기본값으로 저장 중...', 'warn', 0);
@@ -1105,7 +1311,7 @@ async function applyRawJSON() {
   if (!raw) { showMsg('json-raw-msg', '⚠ 입력값 없음', 'warn', 3000); return; }
   try {
     const parsed = JSON.parse(raw);
-    D = deepMerge(D, parsed);
+    D = normalizeData(deepMerge(D, parsed));
     showMsg('json-raw-msg', '☁ Drive에 저장 중...', 'warn', 0);
     const ok = await saveState();
     updateSaveBadge();
@@ -1121,7 +1327,6 @@ function showCurrentJSON() {
   if (el) el.value = JSON.stringify(D, null, 2);
 }
 
-// ─── 유틸 ───
 function showMsg(id, text, type, clearMs) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -1132,13 +1337,18 @@ function showMsg(id, text, type, clearMs) {
 }
 
 function escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
 }
 
 // ════════════════════════════════════════════════
 // 10. INIT
 // ════════════════════════════════════════════════
 function renderAll() {
+  D = normalizeData(D);
   updateSaveBadge();
   renderSummaryCards();
   fillBaseConfig();
@@ -1152,15 +1362,13 @@ function renderAll() {
 }
 
 async function init() {
-  // 1) 기본값으로 우선 렌더 (빠른 초기 표시)
   renderAll();
-  // 2) GAS에서 실제 데이터 불러오기
   await loadFromGAS();
-  // 3) 불러온 데이터로 재렌더
   renderAll();
 }
 
 init();
 </script>
+
 </body>
 </html>
