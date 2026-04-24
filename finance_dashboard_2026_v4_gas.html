@@ -448,21 +448,22 @@ const INCOME_ROWS = [
   { field:'side_income_2_amount', label:'부수입② 금액',     type:'number' },
 ];
 const EXPENSE_ROWS = [
-  { field:'rakuten_bill',           label:'라쿠텐 카드',     type:'number' },
-  { field:'paypay_bill',            label:'PayPay 카드',     type:'number' },
-  { field:'paidy_bill',             label:'Paidy',           type:'number' },
+  { field:'rakuten_bill',           label:'라쿠텐카드',       type:'number' },
+  { field:'paypay_bill',            label:'페이페이카드',      type:'number' },
+  { field:'paidy_bill',             label:'페이디',           type:'number' },
   { field:'rent',                   label:'야칭',             type:'number' },
-  { field:'phone',                  label:'폰비',             type:'number' },
-  { field:'tax',                    label:'세금',             type:'number' },
-  { field:'tax_note',               label:'세금 메모',        type:'text'   },
   { field:'internet_bill',          label:'인터넷비',         type:'number' },
   { field:'utility_bill',           label:'광열비',           type:'number' },
   { field:'water_bill',             label:'수도세',           type:'number' },
-  { field:'ai_subscription',        label:'AI구독료',         type:'number' },
+  { field:'phone',                  label:'폰비',             type:'number' },
   { field:'youtube_subscription',   label:'유튜브구독료',      type:'number' },
+  { field:'ai_subscription',        label:'에이아이구독료',    type:'number' },
+  { field:'tax',                    label:'세금',             type:'number' },
+  { field:'tax_note',               label:'세금메모',         type:'text'   },
   { field:'misc_expense',           label:'기타지출',         type:'number' },
-  { field:'debt_repayment_actual',  label:'리보 상환액',      type:'number', cls:'row-repay' },
-  { field:'revo_note',              label:'리보 메모',        type:'text'   },
+  { field:'misc_note',              label:'기타메모',         type:'text'   },
+  { field:'debt_repayment_actual',  label:'리보상환액',        type:'number', cls:'row-repay' },
+  { field:'revo_note',              label:'리보메모',         type:'text'   },
 ];
 const KRW_INCOME_ROWS = [
   { field:'krw_exchange_deposit', label:'엔화 환전입금', type:'number' },
@@ -500,7 +501,7 @@ const DEFAULT_MONTH_TEMPLATE = {
   rakuten_bill: 0, paypay_bill: 0, paidy_bill: 0,
   rent: 70550, phone: 3000, tax: 7000, tax_note: '',
   internet_bill: 0, utility_bill: 0, water_bill: 0,
-  ai_subscription: 0, youtube_subscription: 0, misc_expense: 0,
+  ai_subscription: 0, youtube_subscription: 0, misc_expense: 0, misc_note: '',
   debt_repayment_actual: 0, revo_note: '',
   krw_exchange_deposit: 0,
   krw_side_income: 0,
@@ -999,19 +1000,19 @@ function renderSettlements() {
     ].join('');
 
     const expItems = [
-      { label:'라쿠텐 카드',    val:s.rakuten_bill },
-      { label:'PayPay 카드',    val:s.paypay_bill },
-      { label:'Paidy',          val:s.paidy_bill },
-      { label:'야칭',            val:s.rent },
-      { label:'폰비',            val:s.phone },
-      { label:'세금',            val:s.tax },
-      { label:'인터넷비',        val:s.internet_bill },
-      { label:'광열비',          val:s.utility_bill },
-      { label:'수도세',          val:s.water_bill },
-      { label:'AI구독료',        val:s.ai_subscription },
-      { label:'유튜브구독료',     val:s.youtube_subscription },
-      { label:'기타지출',         val:s.misc_expense },
-      { label:'리보 상환',        val:s.debt_repayment_actual },
+      { label:'라쿠텐카드',      val:s.rakuten_bill },
+      { label:'페이페이카드',    val:s.paypay_bill },
+      { label:'페이디',         val:s.paidy_bill },
+      { label:'야칭',           val:s.rent },
+      { label:'인터넷비',       val:s.internet_bill },
+      { label:'광열비',         val:s.utility_bill },
+      { label:'수도세',         val:s.water_bill },
+      { label:'폰비',           val:s.phone },
+      { label:'유튜브구독료',    val:s.youtube_subscription },
+      { label:'에이아이구독료',  val:s.ai_subscription },
+      { label:'세금',           val:s.tax },
+      { label:'기타지출',        val:s.misc_expense },
+      { label:'리보상환액',      val:s.debt_repayment_actual },
     ];
     const expenseRows = expItems
       .filter(x => num(x.val) > 0)
@@ -1034,9 +1035,11 @@ function renderSettlements() {
     const noteHtml = s.note
       ? `<div class="notice notice-blue" style="margin-top:8px;"><span>✦</span><span style="margin-left:4px;">엔화 메모 · ${escHtml(s.note)}</span></div>` : '';
     const taxNoteHtml = s.tax_note
-      ? `<div class="notice notice-blue" style="margin-top:8px;"><span>✦</span><span style="margin-left:4px;">세금 메모 · ${escHtml(s.tax_note)}</span></div>` : '';
+      ? `<div class="notice notice-blue" style="margin-top:8px;"><span>✦</span><span style="margin-left:4px;">세금메모 · ${escHtml(s.tax_note)}</span></div>` : '';
+    const miscNoteHtml = s.misc_note
+      ? `<div class="notice notice-blue" style="margin-top:8px;"><span>✦</span><span style="margin-left:4px;">기타메모 · ${escHtml(s.misc_note)}</span></div>` : '';
     const revoNoteHtml = s.revo_note
-      ? `<div class="notice notice-blue" style="margin-top:8px;"><span>✦</span><span style="margin-left:4px;">리보 메모 · ${escHtml(s.revo_note)}</span></div>` : '';
+      ? `<div class="notice notice-blue" style="margin-top:8px;"><span>✦</span><span style="margin-left:4px;">리보메모 · ${escHtml(s.revo_note)}</span></div>` : '';
     const krwNoteHtml = s.krw_note
       ? `<div class="notice notice-blue" style="margin-top:8px;"><span>✦</span><span style="margin-left:4px;">한화 메모 · ${escHtml(s.krw_note)}</span></div>` : '';
 
@@ -1104,6 +1107,7 @@ function renderSettlements() {
           <table class="row-table">${krwExpenseRows}</table>
           ${noteHtml}
           ${taxNoteHtml}
+          ${miscNoteHtml}
           ${revoNoteHtml}
           ${krwNoteHtml}
           ${alerts.join('')}
